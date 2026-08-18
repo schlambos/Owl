@@ -1,0 +1,6 @@
+{
+  "companion": {
+    "enabled": true,
+    "binaryPath": "/Users/matt/Repos/omo-slim/apps/server/test/companion-sandbox/proj/bin/companion"
+  }
+}

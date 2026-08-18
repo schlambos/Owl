@@ -1,0 +1,14 @@
+{
+  "preset": "p1",
+  "presets": {
+    "p1": {
+      "explorer": { "model": "m/ex" }
+    }
+  },
+  "agents": {
+    "explorer": {
+      "model": "m/ex",
+      "prompt": "INLINE explorer"
+    }
+  }
+}

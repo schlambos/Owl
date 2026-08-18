@@ -1,0 +1,39 @@
+{
+  "_comment": "REAL anonymized capture from GET /session/:id/message on OpenCode 127.0.0.1:4096 (2026-08-11). Completed `task` tool part as persisted in a parent (orchestrator) session. Prompt text redacted; IDs anonymized; structure/tool/state/metadata/time fields preserved verbatim. NOTE: state.metadata.{parentSessionId,sessionId} persist and give direct job<->child-session correlation. Board aliases (exp-1 style) were NOT found in persisted outputs (board snapshots are transient prompt-transform parts).",
+  "info": {
+    "agent": "orchestrator",
+    "id": "msg_sample00000000000001",
+    "model": { "id": "sample-model", "providerID": "sample-provider", "variant": "default" },
+    "role": "assistant",
+    "sessionID": "ses_parent00000000000000000",
+    "summary": { "additions": 0, "deletions": 0, "files": 0 },
+    "time": { "created": 1786493280000, "completed": 1786493620000 }
+  },
+  "parts": [
+    {
+      "type": "tool",
+      "tool": "task",
+      "callID": "call_sample0000000001",
+      "id": "prt_sample00000000000001",
+      "messageID": "msg_sample00000000000001",
+      "sessionID": "ses_parent00000000000000000",
+      "state": {
+        "input": {
+          "description": "Sample task description",
+          "prompt": "<sample-prompt-redacted>",
+          "subagent_type": "explorer"
+        },
+        "metadata": {
+          "parentSessionId": "ses_parent00000000000000000",
+          "sessionId": "ses_child00000000000000001",
+          "model": { "providerID": "sample-provider", "modelID": "sample-model" },
+          "truncated": false
+        },
+        "output": "<task id=\"ses_child00000000000000001\" state=\"completed\">\n<task_result>\n<sample-result-body-redacted>\n</task_result>\n</task>",
+        "status": "completed",
+        "time": { "start": 1786493282899, "end": 1786493433039 },
+        "title": "Sample task description"
+      }
+    }
+  ]
+}

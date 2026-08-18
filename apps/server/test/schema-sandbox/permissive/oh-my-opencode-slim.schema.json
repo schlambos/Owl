@@ -1,0 +1,5 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "SYNTHETIC permissive schema used only by legacy write-mechanics tests. Installed-schema correctness tests use the real local oh-my-opencode-slim schema.",
+  "type": "object"
+}

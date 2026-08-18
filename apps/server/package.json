@@ -1,0 +1,21 @@
+{
+  "name": "@omo/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --cwd ../.. --watch apps/server/src/index.ts",
+    "start": "bun run --cwd ../.. apps/server/src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@omo/shared": "workspace:*",
+    "ajv": "^8.20.0",
+    "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.8.2"
+  }
+}

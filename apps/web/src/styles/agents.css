@@ -1,0 +1,1199 @@
+/*
+  Agents workspace — Account List treatment on the Antigravity shell.
+
+  Imported from pages/AgentsPage.tsx (unlayered). Because the legacy
+  stylesheet lives in the `legacy` cascade layer, every rule here wins
+  over it without specificity games; only Agents-owned selectors and
+  descendants of the Agents drawer/modal panels are touched.
+
+  Visual contract (mirrors the established Account List surface):
+   - one rounded table surface, compact toolbar + search + segmented
+     filters, quiet separators/hover
+   - readable identity (sans) + technical metadata (mono)
+   - quiet healthy status, prominent problems (warn/bad)
+   - restrained badges, blue prominent Edit
+   - semantic tokens only — both themes, no hardcoded palettes
+*/
+
+/* ── Page shell ─────────────────────────────────────────────────── */
+
+.agents-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+/* Page-level error banner (semantic bad treatment). */
+.agents-page .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Summary strip ──────────────────────────────────────────────── */
+
+.agents-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--omo-space-2) var(--omo-space-5);
+  align-items: baseline;
+  margin: 0;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+}
+
+.agents-summary .summary-num {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text);
+}
+
+.agents-summary .summary-num.warn {
+  color: var(--omo-warn);
+}
+
+.agents-summary .summary-num.bad {
+  color: var(--omo-bad);
+}
+
+/* ── Compact toolbar: search + segmented filters + native toggle ── */
+
+.agents-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.agents-search {
+  flex: 0 1 300px;
+  min-width: 220px;
+  min-height: 32px;
+  padding: 0 var(--omo-space-3);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.agents-search::placeholder {
+  color: var(--omo-text-faint);
+}
+
+/* Segmented filter track (radiogroup of quiet pill segments). */
+.agents-toolbar .filter-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 3px;
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-pill);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.filter-chip:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.filter-chip.active {
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  border-color: var(--omo-border);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.filter-chip .count {
+  margin-left: 0;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text-faint);
+}
+
+.filter-chip.active .count {
+  color: var(--omo-text-muted);
+}
+
+/* Native-agents toggle — quiet checkbox aligned to the row end. */
+.agents-native-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.agents-native-toggle input,
+.agents-edit-modal input[type="checkbox"],
+.agents-edit-modal input[type="radio"],
+.agents-detail-drawer input[type="checkbox"] {
+  accent-color: var(--omo-action);
+}
+
+/* ── One rounded table surface ──────────────────────────────────── */
+
+.agents-table-surface {
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: auto;
+}
+
+.agents-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+}
+
+.agents-table th,
+.agents-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--omo-border);
+  vertical-align: top;
+  text-align: left;
+}
+
+.agents-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.agents-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.agents-table tbody tr {
+  transition: background var(--omo-motion-fast) var(--omo-ease);
+}
+
+.agents-table tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.agents-table tbody tr.selected td {
+  background: var(--omo-action-soft);
+}
+
+.agents-table td.agents-empty {
+  padding: var(--omo-space-5);
+  color: var(--omo-text-muted);
+}
+
+/* Sortable header buttons read as header labels. */
+.agents-table th .sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.agents-table th .sort-btn:hover {
+  color: var(--omo-text);
+}
+
+.agents-table th[aria-sort="ascending"] .sort-btn,
+.agents-table th[aria-sort="descending"] .sort-btn {
+  color: var(--omo-text);
+}
+
+.sort-indicator {
+  font-size: 9px;
+  color: var(--omo-text-faint);
+  min-width: 8px;
+  text-align: center;
+}
+
+.sort-indicator.active {
+  color: var(--omo-action);
+}
+
+/* ── Agent identity cell ────────────────────────────────────────── */
+
+.agent-name-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--omo-text-md);
+  color: var(--omo-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.agent-name-btn:hover {
+  color: var(--omo-action);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.agent-name-btn[aria-expanded="true"] {
+  color: var(--omo-action);
+}
+
+.agent-cell-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+}
+
+/* ── Assignment cell ────────────────────────────────────────────── */
+
+.model-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.model-primary {
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-md);
+  font-weight: 600;
+  color: var(--omo-text);
+}
+
+.model-canonical {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+}
+
+.model-canonical {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34ch;
+}
+
+.model-variant {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-muted);
+}
+
+.aligned-row .model-cell {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+/* Diverged rows — explicit Assigned / Effective / Live layers. */
+.diverged-row .layer {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 2px var(--omo-space-2);
+  margin-bottom: 2px;
+}
+
+.diverged-row .layer-label {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  align-self: center;
+}
+
+.diverged-row .layer-value {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diverged-row .state-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* ── Restrained badges (scoped to Agents surfaces) ──────────────── */
+
+.agents-page .pill,
+.agents-table .source-badge,
+.agents-table .alignment-pill,
+.agents-table .fallback-count,
+.agents-table .probe-inline,
+.agents-detail-drawer .pill,
+.agents-detail-drawer .alignment-pill,
+.agents-detail-drawer .probe-inline,
+.agents-edit-modal .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.agents-page .pill.ok,
+.agents-table .alignment-pill.aligned,
+.agents-detail-drawer .alignment-pill.aligned {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.agents-page .pill.warn,
+.agents-detail-drawer .pill.warn,
+.agents-edit-modal .pill.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.agents-page .pill.bad,
+.agents-detail-drawer .pill.bad,
+.agents-edit-modal .pill.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+/* Source badge — clickable provenance pill. */
+.agents-table .source-badge {
+  cursor: pointer;
+  transition:
+    border-color var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.agents-table .source-badge:hover {
+  border-color: var(--omo-border-strong);
+  color: var(--omo-text);
+}
+
+.agents-table .source-badge.preset {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.agents-table .source-badge.root {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.agents-table .source-badge.project,
+.agents-table .source-badge.council {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.agents-table .source-badge.custom {
+  color: var(--omo-text);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border-strong);
+}
+
+.agents-table .source-badge.builtin {
+  color: var(--omo-text-faint);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+}
+
+/* Alignment states — quiet healthy, prominent problems. */
+.agents-table .alignment-pill.assignment-override,
+.agents-detail-drawer .alignment-pill.assignment-override {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.agents-table .alignment-pill.runtime-drift,
+.agents-table .alignment-pill.unconfigured-live,
+.agents-detail-drawer .alignment-pill.runtime-drift,
+.agents-detail-drawer .alignment-pill.unconfigured-live {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.agents-table .alignment-pill.both,
+.agents-detail-drawer .alignment-pill.both {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+.agents-table .alignment-pill.unconfigured,
+.agents-detail-drawer .alignment-pill.unconfigured {
+  color: var(--omo-text-faint);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+}
+
+.agents-table .source-detail {
+  margin-top: 4px;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+  word-break: break-all;
+}
+
+/* ── Signals cell ───────────────────────────────────────────────── */
+
+.signals-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.agents-table .fallback-count {
+  cursor: pointer;
+  transition:
+    border-color var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.agents-table .fallback-count:hover {
+  border-color: var(--omo-border-strong);
+  color: var(--omo-text);
+}
+
+.fallback-chain {
+  margin-top: 4px;
+  padding: var(--omo-space-2) var(--omo-space-3);
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text);
+}
+
+.fallback-chain strong {
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  color: var(--omo-text-muted);
+}
+
+.fallback-chain ol {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.fallback-chain li {
+  margin: 2px 0;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.agents-table .probe-inline.bad,
+.agents-detail-drawer .probe-inline.bad,
+.agents-edit-modal .probe-inline.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+.agents-table .probe-inline.warn,
+.agents-detail-drawer .probe-inline.warn,
+.agents-edit-modal .probe-inline.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.agents-table .probe-inline.muted,
+.agents-detail-drawer .probe-inline.muted {
+  color: var(--omo-text-faint);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+}
+
+.probe-inline-model {
+  margin-left: 4px;
+  font-family: var(--omo-font-mono);
+  font-size: 10px;
+  color: var(--omo-text-faint);
+}
+
+.signal-more {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.signal-more:hover {
+  color: var(--omo-text);
+}
+
+.signal-testing {
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+}
+
+.signal-issue-list {
+  margin: 2px 0 0;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ── Actions cell ───────────────────────────────────────────────── */
+
+.agents-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.owner-link {
+  font-size: var(--omo-text-sm);
+  color: var(--omo-action);
+  text-decoration: none;
+  white-space: normal;
+}
+
+.owner-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Detail drawer (side sheet) ─────────────────────────────────── */
+
+.agents-detail-drawer {
+  width: min(480px, 94vw);
+  height: 100vh;
+  overflow: auto;
+  background: var(--omo-surface);
+  border-left: 1px solid var(--omo-border-strong);
+  box-shadow: var(--omo-shadow-pop);
+  padding: var(--omo-space-5) var(--omo-space-5) var(--omo-space-8);
+}
+
+.agents-detail-drawer #agent-detail-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+}
+
+.agents-drawer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.agents-detail-drawer .inspector-head,
+.agents-edit-modal .inspector-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--omo-space-3);
+  border-bottom: 1px solid var(--omo-border);
+  padding-bottom: var(--omo-space-3);
+  margin-bottom: 0;
+}
+
+.agents-detail-drawer .inspector-title,
+.agents-edit-modal .inspector-title {
+  margin: 0;
+  font-size: var(--omo-text-xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+}
+
+.agents-detail-drawer .inspector-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Cards inside Agents surfaces — quiet section panels. */
+.agents-detail-drawer .card,
+.agents-edit-modal .card {
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  margin: 0;
+}
+
+.agents-detail-drawer .card h2,
+.agents-edit-modal .card h2 {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+}
+
+.agents-detail-drawer .row-kv,
+.agents-edit-modal .row-kv {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 4px var(--omo-space-3);
+  font-size: var(--omo-text-sm);
+}
+
+.agents-detail-drawer .row-kv dt,
+.agents-edit-modal .row-kv dt {
+  color: var(--omo-text-faint);
+}
+
+.agents-detail-drawer .row-kv dd,
+.agents-edit-modal .row-kv dd {
+  margin: 0;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text);
+  word-break: break-all;
+}
+
+.agents-detail-drawer .source-detail {
+  margin-top: 4px;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+  word-break: break-all;
+}
+
+.agents-fallback-list,
+.agents-issue-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.agents-fallback-list li,
+.agents-issue-list li {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.agents-detail-drawer .toolbar {
+  margin-top: var(--omo-space-2);
+}
+
+.agents-footnote {
+  margin: var(--omo-space-2) 0 0;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-muted);
+}
+
+.agents-quiet-note {
+  margin: 0;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+}
+
+/* Drawer tabs. */
+.agents-detail-drawer .tab-bar {
+  display: flex;
+  gap: var(--omo-space-4);
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--omo-border);
+  margin-bottom: 0;
+}
+
+.agents-detail-drawer .tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 6px 1px;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.agents-detail-drawer .tab:hover {
+  color: var(--omo-text);
+}
+
+.agents-detail-drawer .tab.active {
+  color: var(--omo-action);
+  border-bottom-color: var(--omo-action);
+  font-weight: 600;
+}
+
+/* Tables inside Agents drawer/modal — token header, quiet rules. */
+.agents-detail-drawer table.data,
+.agents-edit-modal table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.agents-detail-drawer table.data th,
+.agents-detail-drawer table.data td,
+.agents-edit-modal table.data th,
+.agents-edit-modal table.data td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--omo-border);
+  vertical-align: top;
+}
+
+.agents-detail-drawer table.data th,
+.agents-edit-modal table.data th {
+  position: static;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  z-index: auto;
+}
+
+.agents-detail-drawer table.data tr:hover td,
+.agents-edit-modal table.data tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.agents-detail-drawer .table-wrap,
+.agents-edit-modal .table-wrap {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  overflow: auto;
+  background: var(--omo-surface);
+}
+
+/* Prompt text blocks. */
+.agents-detail-drawer .msg-pre,
+.agents-edit-modal .msg-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: 1.45;
+  max-height: 420px;
+  overflow: auto;
+  background: var(--omo-canvas);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  padding: var(--omo-space-3);
+}
+
+.agents-edit-modal .msg-pre.diff-patch {
+  background: var(--omo-canvas);
+  max-height: 360px;
+}
+
+.agents-detail-drawer .msg-pre.dim,
+.agents-detail-drawer .muted,
+.agents-edit-modal .muted {
+  color: var(--omo-text-muted);
+}
+
+.agents-detail-drawer .muted,
+.agents-edit-modal .muted {
+  font-size: var(--omo-text-sm);
+}
+
+/* Advisory blocks — quiet info, prominent warn/bad. */
+.agents-detail-drawer .warn-block,
+.agents-edit-modal .warn-block {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: var(--omo-space-2) 0 0;
+}
+
+.agents-detail-drawer .info-block,
+.agents-edit-modal .info-block {
+  border: 1px solid var(--omo-border-strong);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: var(--omo-space-2) 0 0;
+}
+
+.agents-detail-drawer .error,
+.agents-edit-modal .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: 0;
+}
+
+/* Secondary buttons inside Agents surfaces match the primitive. */
+.agents-detail-drawer .btn,
+.agents-edit-modal .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  padding: 4px 10px;
+  line-height: 1.3;
+  box-shadow: var(--omo-shadow-sm);
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.agents-detail-drawer .btn:hover:not(:disabled),
+.agents-edit-modal .btn:hover:not(:disabled) {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border-strong);
+}
+
+.agents-detail-drawer .btn:disabled,
+.agents-edit-modal .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.agents-detail-drawer .btn.btn-xs,
+.agents-edit-modal .btn.btn-xs {
+  padding: 2px 8px;
+  font-size: var(--omo-text-xs);
+  box-shadow: none;
+}
+
+/* ── Edit modal ─────────────────────────────────────────────────── */
+
+.agents-edit-modal {
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow-pop);
+  padding: var(--omo-space-5) var(--omo-space-6) var(--omo-space-8);
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.agents-edit-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.agents-edit-modal .toolbar {
+  display: flex;
+  gap: var(--omo-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0;
+}
+
+.agents-catalog-filter {
+  width: 100%;
+  min-height: 30px;
+  margin: var(--omo-space-2) 0;
+  padding: 0 var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+}
+
+.agents-catalog-filter::placeholder {
+  color: var(--omo-text-faint);
+}
+
+.agents-edit-modal .agents-quiet-note {
+  margin: 0 0 var(--omo-space-2);
+}
+
+/* Model chain rows — form controls share the compact token look. */
+.agents-edit-modal .chain-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.agents-edit-modal .chain-row select,
+.agents-edit-modal .chain-row input {
+  flex: 1 1 150px;
+  min-width: 0;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  color: var(--omo-text);
+  border-radius: var(--omo-radius-sm);
+  padding: 4px 6px;
+  font-size: var(--omo-text-sm);
+}
+
+.agents-edit-modal .chain-row input.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.chain-role-label {
+  white-space: nowrap;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+}
+
+.agents-edit-modal .chain-row input.chain-variant-input {
+  flex: 0 1 110px;
+  width: 110px;
+}
+
+.agents-chain-note {
+  margin: var(--omo-space-2) 0 0;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-muted);
+}
+
+.agents-edit-modal .linkish {
+  background: none;
+  border: none;
+  color: var(--omo-action);
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  padding: 0;
+  text-align: left;
+}
+
+.agents-edit-modal .linkish:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.agents-variant-input {
+  display: block;
+  width: 100%;
+  margin-top: var(--omo-space-1);
+  min-height: 30px;
+  padding: 0 var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text);
+  font-size: var(--omo-text-sm);
+}
+
+/* Write-destination options. */
+.agents-edit-modal .dest-scope {
+  margin-top: var(--omo-space-2);
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+}
+
+.agents-edit-modal .dest-option {
+  display: block;
+  margin: 3px 0 3px 10px;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+}
+
+.agents-edit-modal .dest-path {
+  margin-left: 26px;
+  font-size: var(--omo-text-xs);
+  word-break: break-all;
+}
+
+.agents-edit-modal .section-title {
+  margin: var(--omo-space-3) 0 var(--omo-space-1);
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  color: var(--omo-text-faint);
+}
+
+.agents-edit-modal .expand-toggle {
+  background: transparent;
+  border: none;
+  color: var(--omo-text-muted);
+  cursor: pointer;
+  font-size: var(--omo-text-xs);
+  padding: 2px 0;
+}
+
+.agents-edit-modal .expand-toggle:hover {
+  color: var(--omo-text);
+}
+
+.sim-live-note {
+  color: var(--omo-text-faint);
+}
+
+.schema-issues {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: var(--omo-text-xs);
+}
+
+.agents-edit-modal .schema-issues li {
+  font-family: var(--omo-font-mono);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .agents-search {
+    flex: 0 1 240px;
+  }
+}
+
+@media (max-width: 999px) {
+  .agents-toolbar {
+    gap: var(--omo-space-2);
+  }
+
+  .agents-native-toggle {
+    margin-left: 0;
+  }
+
+  .agents-table th,
+  .agents-table td {
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 767px) {
+  .agents-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .agents-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .agents-toolbar .filter-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .agents-native-toggle {
+    align-self: flex-start;
+  }
+
+  .agents-summary {
+    gap: var(--omo-space-1) var(--omo-space-4);
+  }
+
+  .agents-table th,
+  .agents-table td {
+    padding: 7px 8px;
+  }
+
+  .agents-detail-drawer {
+    width: 100vw;
+    padding: var(--omo-space-4) var(--omo-space-3) var(--omo-space-8);
+  }
+
+  .agents-edit-modal {
+    padding: var(--omo-space-4) var(--omo-space-4) var(--omo-space-6);
+  }
+
+  .agents-detail-drawer .row-kv,
+  .agents-edit-modal .row-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+}

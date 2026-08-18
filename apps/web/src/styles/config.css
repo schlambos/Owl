@@ -1,0 +1,653 @@
+/*
+  Config workspace — Settings / API-Proxy treatment on the Antigravity shell.
+
+  Imported from pages/ConfigPage.tsx (unlayered). Legacy styles live in the
+  `legacy` cascade layer, so every rule here wins without specificity games.
+
+  Visual contract:
+   - soft secondary segmented navigation for provenance / revisions / raw
+   - large clean section surfaces (not consumer cards)
+   - structured source / provenance list + detail
+   - inset rows, aligned actions
+   - Monaco framed professionally inside the shell — no consumer-card chrome
+   - semantic tokens only — both themes inherit from omo.tokens
+   - sans for UI copy; mono strictly for technical content (paths, hashes,
+     JSON, schema keys, diffs)
+   - responsive 1440 / 1000 / 768
+*/
+
+.omo-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-config-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-source {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-config-select {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-config-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.omo-config-quiet {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-config-note {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-config-kicker {
+  margin: 0 0 var(--omo-space-2);
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+.omo-config-break,
+.omo-config-path {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── Surfaces ──────────────────────────────────────────────────────── */
+
+.omo-config-surface {
+  min-width: 0;
+}
+
+.omo-config-surface h2 {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+  text-transform: none;
+}
+
+.omo-config-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.omo-config-actions-end {
+  justify-content: flex-end;
+}
+
+/* ── Banner / schema / source cards ────────────────────────────────── */
+
+.omo-config-banner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-banner-note {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-config-sources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-config-source-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--omo-space-3);
+}
+
+.omo-config-source-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-source-card .omo-config-quiet {
+  flex: 1;
+}
+
+/* ── Tables / inset rows ───────────────────────────────────────────── */
+
+.omo-config-table-wrap {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  overflow: auto;
+  background: var(--omo-surface);
+  box-shadow: var(--omo-shadow);
+  min-width: 0;
+}
+
+.omo-config-table-wrap-inset {
+  box-shadow: none;
+  background: var(--omo-surface-muted);
+  border-radius: var(--omo-radius-md);
+}
+
+.omo-config table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-config table.data th,
+.omo-config table.data td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-config table.data tr:last-child td {
+  border-bottom: none;
+}
+
+.omo-config table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.omo-config-table-wrap-inset table.data th {
+  background: var(--omo-surface-muted);
+}
+
+.omo-config table.data tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-config table.data td.omo-mono,
+.omo-config table.data .omo-config-break {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-config-empty {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Key / value ───────────────────────────────────────────────────── */
+
+.omo-config-kv {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 6px var(--omo-space-3);
+  margin: 0;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-config-kv dt {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-sans);
+}
+
+.omo-config-kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--omo-text);
+}
+
+.omo-config-kv dd.omo-mono,
+.omo-config-kv .omo-config-pre {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-config-pre {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: var(--omo-leading);
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* ── Provenance list / detail ──────────────────────────────────────── */
+
+.omo-config-split {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  min-height: 420px;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+}
+
+.omo-config-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+  padding: var(--omo-space-3);
+  background: var(--omo-surface-muted);
+  border-right: 1px solid var(--omo-border);
+  overflow: auto;
+  max-height: calc(100vh - 240px);
+  overscroll-behavior: contain;
+}
+
+.omo-config-filter {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  padding: 6px 10px;
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-config-filter::placeholder {
+  color: var(--omo-text-faint);
+}
+
+.omo-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.omo-config-row {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  line-height: 1.3;
+  padding: 7px 8px;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-config-row:hover {
+  background: var(--omo-surface-hover);
+}
+
+.omo-config-row[aria-current="true"] {
+  background: var(--omo-action-soft);
+  border-color: color-mix(in srgb, var(--omo-action) 28%, transparent);
+}
+
+.omo-config-row-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--omo-text);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-config-row[aria-current="true"] .omo-config-row-path {
+  color: var(--omo-action);
+}
+
+.omo-config-pane {
+  min-width: 0;
+  padding: var(--omo-space-4) var(--omo-space-5) var(--omo-space-8);
+  overflow: auto;
+  max-height: calc(100vh - 240px);
+  overscroll-behavior: contain;
+}
+
+.omo-config-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-config-detail-title {
+  margin: 0;
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* ── Revisions ─────────────────────────────────────────────────────── */
+
+.omo-config-revision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-config .linkish {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--omo-action);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  cursor: pointer;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.omo-config .linkish:hover {
+  color: var(--omo-action-hover);
+  text-decoration: underline;
+}
+
+/* ── Raw editor ────────────────────────────────────────────────────── */
+
+.omo-config-raw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-raw-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-raw-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.omo-config-raw-path,
+.omo-config-raw-fp {
+  margin-top: 6px;
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-config-diag-list {
+  margin: var(--omo-space-2) 0 0;
+  padding-left: 18px;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-config-stale-fp {
+  margin-top: var(--omo-space-2);
+}
+
+.omo-config-compare {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-config-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-config-preview-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--omo-radius-pill);
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+
+.omo-config-preview-tab {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-pill);
+  background: transparent;
+  padding: 5px 12px;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease),
+    box-shadow var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-config-preview-tab:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-config-preview-tab[aria-selected="true"] {
+  background: var(--omo-surface);
+  border-color: var(--omo-border);
+  color: var(--omo-text);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-config-validation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Monaco host — professional frame, not a consumer card ─────────── */
+
+.omo-config .omo-monaco-host {
+  min-height: 360px;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface-muted);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.omo-config .omo-monaco-diff {
+  min-height: 260px;
+}
+
+/* ── Banners (scoped restyle of shared .error / warn / info) ───────── */
+
+.omo-config .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-config .warn-block {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: 0;
+}
+
+.omo-config .info-block {
+  border: 1px solid var(--omo-ok-border);
+  background: var(--omo-ok-bg);
+  color: var(--omo-ok);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: 0;
+}
+
+/* ── Responsive: 1440 → 1000 → 768 ─────────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .omo-config-source-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .omo-config-split {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .omo-config-side {
+    max-height: 280px;
+    border-right: none;
+    border-bottom: 1px solid var(--omo-border);
+  }
+
+  .omo-config-pane {
+    max-height: none;
+  }
+
+  .omo-config-raw-meta {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-config .omo-monaco-host {
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 767px) {
+  .omo-config-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-config-tabs {
+    width: 100%;
+  }
+
+  .omo-config-pane {
+    padding: var(--omo-space-3) var(--omo-space-3) var(--omo-space-6);
+  }
+
+  .omo-config-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .omo-config-row-path {
+    white-space: normal;
+  }
+
+  .omo-config .omo-monaco-host,
+  .omo-config .omo-monaco-diff {
+    min-height: 220px;
+  }
+
+  .omo-config-preview-tab,
+  .omo-config .omo-btn,
+  .omo-config .linkish {
+    min-height: 44px;
+  }
+
+  .omo-config .linkish {
+    display: inline-flex;
+    align-items: center;
+  }
+}

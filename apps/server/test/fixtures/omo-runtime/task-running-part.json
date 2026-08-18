@@ -1,0 +1,40 @@
+{
+  "_comment": "REAL anonymized capture from GET /session/:id/message on OpenCode 127.0.0.1:4096 (2026-08-11). RUNNING `task` tool part as persisted: state has NO output key and NO time.end while the background lane is active. runningPlaceholderOutput shows the byte-stable placeholder OMO renders into the tool result for providers (renderRunningTaskPlaceholder, dist/index.js:24927-24938) — captured shape, IDs anonymized.",
+  "info": {
+    "agent": "orchestrator",
+    "id": "msg_sample00000000000002",
+    "model": { "id": "sample-model", "providerID": "sample-provider", "variant": "default" },
+    "role": "assistant",
+    "sessionID": "ses_parent00000000000000000",
+    "summary": { "additions": 0, "deletions": 0, "files": 0 },
+    "time": { "created": 1786499930000 }
+  },
+  "parts": [
+    {
+      "type": "tool",
+      "tool": "task",
+      "callID": "call_sample0000000002",
+      "id": "prt_sample00000000000002",
+      "messageID": "msg_sample00000000000002",
+      "sessionID": "ses_parent00000000000000000",
+      "state": {
+        "input": {
+          "description": "Sample running task description",
+          "prompt": "<sample-prompt-redacted>",
+          "subagent_type": "fixer",
+          "task_id": null,
+          "command": null
+        },
+        "metadata": {
+          "parentSessionId": "ses_parent00000000000000000",
+          "sessionId": "ses_child00000000000000002",
+          "model": { "providerID": "sample-provider", "modelID": "sample-model" }
+        },
+        "status": "running",
+        "time": { "start": 1786499935922 },
+        "title": "Sample running task description"
+      }
+    }
+  ],
+  "runningPlaceholderOutput": "<task id=\"ses_child00000000000000002\" state=\"running\">\n<summary>Background task running</summary>\n<task_result>\nThe task is working in the background. You will be notified automatically when it finishes.\n</task_result>\n</task>"
+}

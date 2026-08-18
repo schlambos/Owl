@@ -1,0 +1,12 @@
+{
+  "_comment": "Task status output formats verified against installed oh-my-opencode-slim@2.2.10 dist/index.js. XML format: renderRunningTaskPlaceholder (dist/index.js:24927-24938) and terminal <task> wrappers. Header-line format: formatCancelledTaskStatusOutput (dist/index.js:27172-27181). Parsers: parseTaskIdFromTaskOutput (24937-24951), parseTaskStateFromOutput (24976-24986), parseTaskResultFromOutput (24988-24991), timedOut regex (24972). IDs anonymized.",
+  "xmlCompleted": "<task id=\"ses_child00000000000000001\" state=\"completed\">\n<task_result>\nSample result body line one.\nSample result body line two.\n</task_result>\n</task>",
+  "xmlError": "<task id=\"ses_child00000000000000003\" state=\"error\">\n<task_error>\nSample error body.\n</task_error>\n</task>",
+  "xmlCancelled": "<task id=\"ses_child00000000000000004\" state=\"cancelled\">\n<task_result>\ncancelled\n</task_result>\n</task>",
+  "xmlRunningPlaceholder": "<task id=\"ses_child00000000000000002\" state=\"running\">\n<summary>Background task running</summary>\n<task_result>\nThe task is working in the background. You will be notified automatically when it finishes.\n</task_result>\n</task>",
+  "headerCancelled": "task_id: ses_child00000000000000004\nstate: cancelled\n\n<task_error>\ncancelled\n</task_error>",
+  "headerTimedOutRunning": "task_id: ses_child00000000000000002\nstate: running\n\nTimed out after 900000ms waiting for task to complete\n\n<task_result>\nThe task is working in the background.\n</task_result>",
+  "headerWithAliasNote": "task_id: ses_child00000000000000001 (exp-1)\nstate: completed\n\n<task_result>\nSample result body.\n</task_result>",
+  "boardRowSample": "- exp-1 / ses_child00000000000000001 / explorer / completed, reconciled",
+  "_boardRowComment": "Board row line shape per dist/index.js:25487: '- alias / taskID / agent / state'. Board snapshots are transient prompt-transform parts (metadata key oh-my-opencode-slim.backgroundJobBoard, dist/index.js:27258) and were NOT found persisted in live message capture."
+}

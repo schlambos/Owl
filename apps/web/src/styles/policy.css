@@ -1,0 +1,828 @@
+/*
+  Policy workspaces — Presets, Capabilities, Prompts.
+
+  Imported from the policy pages and CapabilityEditModal (unlayered).
+  Legacy styles live in the `legacy` cascade layer, so every rule here
+  wins without specificity games.
+
+  Visual contract:
+   - Account List list/detail + table toolbars (Presets, Prompts)
+   - dense matrix in one rounded surface (Capabilities)
+   - Settings-style forms (capability modal, prompt editor)
+   - quiet healthy / prominent issues
+   - semantic tokens only — both themes, no owned inline styles
+   - sans for UI copy; mono for technical ids, paths, JSON, diffs
+   - responsive 1440 / 1000 / 768
+*/
+
+/* ── Page shell ─────────────────────────────────────────────────────── */
+
+.omo-policy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-policy-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-policy .error,
+.omo-policy-modal .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.omo-policy .warn-block,
+.omo-policy-modal .warn-block {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.omo-policy-quiet,
+.omo-policy .muted,
+.omo-policy-modal .muted {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-policy-kicker {
+  margin: 0 0 var(--omo-space-2);
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+/* ── Surfaces ───────────────────────────────────────────────────────── */
+
+.omo-policy-surface {
+  min-width: 0;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+}
+
+.omo-policy-inset {
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-policy-inset h2,
+.omo-policy-modal .omo-policy-inset h2 {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-policy-title {
+  margin: 0;
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-policy-title-xl {
+  font-size: var(--omo-text-xl);
+}
+
+/* ── List / detail frame ────────────────────────────────────────────── */
+
+.omo-policy-frame {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  min-height: 520px;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+}
+
+.omo-policy-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+  padding: var(--omo-space-3);
+  background: var(--omo-surface-muted);
+  border-right: 1px solid var(--omo-border);
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  overscroll-behavior: contain;
+}
+
+.omo-policy-pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+  padding: var(--omo-space-4) var(--omo-space-5) var(--omo-space-8);
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  overscroll-behavior: contain;
+}
+
+.omo-policy-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-policy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.omo-policy-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  line-height: 1.3;
+  padding: 7px 8px;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-policy-row:hover {
+  background: var(--omo-surface-hover);
+}
+
+.omo-policy-row[aria-current="true"] {
+  background: var(--omo-action-soft);
+  border-color: color-mix(in srgb, var(--omo-action) 28%, transparent);
+}
+
+.omo-policy-row[aria-current="true"] .omo-policy-row-title {
+  color: var(--omo-action);
+}
+
+.omo-policy-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-policy-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.omo-policy-row-meta {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.omo-policy-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  padding-top: var(--omo-space-2);
+  border-top: 1px solid var(--omo-border);
+}
+
+/* ── Toolbars / controls ────────────────────────────────────────────── */
+
+.omo-policy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-policy-search,
+.omo-policy-input,
+.omo-policy-select,
+.omo-policy-textarea,
+.omo-policy-modal input:not([type="checkbox"]):not([type="radio"]),
+.omo-policy-modal select,
+.omo-policy-modal textarea {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 10px;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-policy-search,
+.omo-policy-input,
+.omo-policy-textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+.omo-policy-search::placeholder,
+.omo-policy-input::placeholder,
+.omo-policy-textarea::placeholder,
+.omo-policy-modal input::placeholder,
+.omo-policy-modal textarea::placeholder {
+  color: var(--omo-text-faint);
+}
+
+.omo-policy-input.omo-mono,
+.omo-policy-textarea.omo-mono,
+.omo-policy-modal input.omo-mono,
+.omo-policy-modal textarea.omo-mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-policy-textarea,
+.omo-policy-modal textarea {
+  min-height: 120px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: var(--omo-leading);
+}
+
+.omo-policy-editor {
+  min-height: 240px;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-policy-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.omo-policy-choice input {
+  accent-color: var(--omo-action);
+  margin: 0;
+}
+
+.omo-policy-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-3);
+}
+
+.omo-policy-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-policy-field-hint {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Head / badges ──────────────────────────────────────────────────── */
+
+.omo-policy-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  min-width: 0;
+  padding-bottom: var(--omo-space-3);
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-policy-head-text {
+  min-width: 0;
+}
+
+.omo-policy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.omo-policy .omo-badge,
+.omo-policy-modal .omo-badge,
+.omo-policy .pill,
+.omo-policy-modal .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.omo-policy .pill.ok,
+.omo-policy-modal .pill.ok {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.omo-policy .pill.warn,
+.omo-policy-modal .pill.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-policy .pill.bad,
+.omo-policy-modal .pill.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────── */
+
+.omo-policy-table-wrap {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  overflow: auto;
+  background: var(--omo-surface);
+  box-shadow: var(--omo-shadow);
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+
+.omo-policy-table-wrap-inset {
+  box-shadow: none;
+  border-radius: var(--omo-radius-md);
+}
+
+.omo-policy table.data,
+.omo-policy-modal table.data,
+.omo-policy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-policy table.data th,
+.omo-policy table.data td,
+.omo-policy-modal table.data th,
+.omo-policy-modal table.data td,
+.omo-policy-table th,
+.omo-policy-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-policy table.data tr:last-child td,
+.omo-policy-modal table.data tr:last-child td,
+.omo-policy-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.omo-policy table.data th,
+.omo-policy-modal table.data th,
+.omo-policy-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.omo-policy table.data tbody tr:hover td,
+.omo-policy-modal table.data tbody tr:hover td,
+.omo-policy-table tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-policy table.data td.omo-mono,
+.omo-policy-modal table.data td.omo-mono,
+.omo-policy-table td.omo-mono,
+.omo-policy .omo-mono,
+.omo-policy-modal .omo-mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.omo-policy-empty-cell {
+  color: var(--omo-text-muted);
+}
+
+/* ── Capabilities matrix ────────────────────────────────────────────── */
+
+.omo-policy-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--omo-space-3);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-policy-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.omo-policy-matrix-wrap {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.omo-policy-matrix th:first-child,
+.omo-policy-matrix td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--omo-surface);
+}
+
+.omo-policy-matrix th:first-child {
+  z-index: 3;
+  background: var(--omo-surface-muted);
+}
+
+.omo-policy-matrix tbody tr:hover td:first-child {
+  background: var(--omo-surface-hover);
+}
+
+.omo-policy-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 24px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-sm);
+  background: transparent;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.omo-policy-cell:hover {
+  background: var(--omo-surface-hover);
+  color: var(--omo-text);
+}
+
+.omo-policy-cell.is-ok {
+  color: var(--omo-ok);
+  font-weight: 500;
+}
+
+.omo-policy-cell.is-warn {
+  color: var(--omo-warn);
+  font-weight: 650;
+}
+
+.omo-policy-cell.is-bad {
+  color: var(--omo-bad);
+  font-weight: 650;
+}
+
+.omo-policy-cell.is-unset {
+  color: var(--omo-text-faint);
+  font-weight: 500;
+}
+
+.omo-policy-cell.is-selected {
+  background: var(--omo-action-soft);
+  border-color: color-mix(in srgb, var(--omo-action) 28%, transparent);
+  color: var(--omo-action);
+}
+
+.omo-policy-state {
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  color: var(--omo-text-muted);
+}
+
+.omo-policy-state.is-ok {
+  color: var(--omo-ok);
+  font-weight: 500;
+}
+
+.omo-policy-state.is-warn {
+  color: var(--omo-warn);
+  font-weight: 650;
+}
+
+.omo-policy-state.is-bad {
+  color: var(--omo-bad);
+  font-weight: 650;
+}
+
+.omo-policy-state.is-faint {
+  color: var(--omo-text-faint);
+}
+
+/* ── KV / composition ───────────────────────────────────────────────── */
+
+.omo-policy-kv,
+.omo-policy-modal .row-kv {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 6px var(--omo-space-3);
+  margin: 0;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-policy-kv dt,
+.omo-policy-modal .row-kv dt {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-sans);
+}
+
+.omo-policy-kv dd,
+.omo-policy-modal .row-kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--omo-text);
+}
+
+.omo-policy-kv dd.omo-mono,
+.omo-policy-modal .row-kv dd.omo-mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-policy-pre,
+.omo-policy-modal .msg-pre {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: var(--omo-leading);
+  max-height: 420px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--omo-canvas);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  padding: var(--omo-space-3);
+}
+
+.omo-policy-pre-dim {
+  color: var(--omo-text-muted);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  max-height: none;
+}
+
+.omo-policy-pre-raw {
+  max-height: 70vh;
+}
+
+.omo-policy-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+/* ── Segmented source / effective / diff ────────────────────────────── */
+
+.omo-policy-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--omo-radius-pill);
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.omo-policy-tab {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-pill);
+  background: transparent;
+  padding: 5px 12px;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease),
+    box-shadow var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-policy-tab:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-policy-tab[aria-selected="true"] {
+  background: var(--omo-surface);
+  border-color: var(--omo-border);
+  color: var(--omo-text);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-policy-tab:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Capability edit modal ──────────────────────────────────────────── */
+
+.omo-policy-modal {
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow-pop);
+  padding: var(--omo-space-5) var(--omo-space-6) var(--omo-space-8);
+  width: min(720px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.omo-policy-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-policy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+/* ── Prompt source actions ──────────────────────────────────────────── */
+
+.omo-policy-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.omo-policy-reason {
+  margin-top: 4px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+}
+
+/* ── Responsive: 1440 → 1000 → 768 ─────────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .omo-policy-frame {
+    grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .omo-policy-frame {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .omo-policy-side {
+    max-height: 280px;
+    border-right: none;
+    border-bottom: 1px solid var(--omo-border);
+  }
+
+  .omo-policy-pane {
+    max-height: none;
+  }
+
+  .omo-policy-kv,
+  .omo-policy-modal .row-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .omo-policy-table th,
+  .omo-policy-table td,
+  .omo-policy table.data th,
+  .omo-policy table.data td {
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 767px) {
+  .omo-policy-pane {
+    padding: var(--omo-space-3) var(--omo-space-3) var(--omo-space-6);
+  }
+
+  .omo-policy-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-policy-row-meta {
+    white-space: normal;
+  }
+
+  .omo-policy-modal {
+    padding: var(--omo-space-4) var(--omo-space-4) var(--omo-space-6);
+    width: 100%;
+  }
+
+  .omo-policy-tabs,
+  .omo-policy-toolbar {
+    width: 100%;
+  }
+
+  .omo-policy-tab,
+  .omo-policy .omo-btn,
+  .omo-policy-modal .omo-btn {
+    min-height: 44px;
+  }
+}

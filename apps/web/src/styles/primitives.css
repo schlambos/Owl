@@ -1,0 +1,240 @@
+.omo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omo-space-2);
+  border-radius: var(--omo-radius-md);
+  border: 1px solid transparent;
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  letter-spacing: 0;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.omo-btn-sm {
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.omo-btn-md {
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.omo-btn-primary {
+  background: var(--omo-action);
+  color: var(--omo-action-text);
+  border-color: var(--omo-action);
+}
+
+.omo-btn-primary:hover:not(:disabled) {
+  background: var(--omo-action-hover);
+  border-color: var(--omo-action-hover);
+}
+
+.omo-btn-secondary {
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  border-color: var(--omo-border-strong);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-btn-secondary:hover:not(:disabled) {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border-strong);
+}
+
+.omo-btn-ghost {
+  background: transparent;
+  color: var(--omo-text-muted);
+}
+
+.omo-btn-ghost:hover:not(:disabled) {
+  background: var(--omo-surface-hover);
+  color: var(--omo-text);
+}
+
+.omo-icon-btn {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+  color: var(--omo-text-muted);
+}
+
+.omo-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.omo-surface {
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+}
+
+.omo-surface-sm {
+  padding: var(--omo-space-3) var(--omo-space-4);
+}
+
+.omo-surface-md {
+  padding: var(--omo-space-4) var(--omo-space-5);
+}
+
+.omo-surface-lg {
+  padding: var(--omo-space-5) var(--omo-space-6);
+}
+
+.omo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  padding: 2px 8px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.omo-badge-ok {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.omo-badge-warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-badge-bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+.omo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--omo-text-faint);
+  flex-shrink: 0;
+}
+
+.omo-dot-ok {
+  background: var(--omo-ok);
+}
+
+.omo-dot-warn {
+  background: var(--omo-warn);
+}
+
+.omo-dot-bad {
+  background: var(--omo-bad);
+}
+
+.omo-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--omo-radius-pill);
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  min-width: 0;
+}
+
+.omo-seg-secondary {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+  gap: 4px;
+}
+
+.omo-seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--omo-radius-pill);
+  padding: 6px 12px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  background: transparent;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease),
+    box-shadow var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-seg-item:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-seg-item[aria-current] {
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  border-color: var(--omo-border);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-seg-secondary .omo-seg-item {
+  padding: 5px 10px;
+  font-weight: 500;
+  color: var(--omo-text-faint);
+}
+
+.omo-seg-secondary .omo-seg-item[aria-current] {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.omo-mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.omo-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.omo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}

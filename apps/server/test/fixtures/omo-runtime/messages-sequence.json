@@ -1,0 +1,120 @@
+{
+  "_comment": "Synthetic message list shaped EXACTLY like live GET /session/:id/message captures (anonymized). Sequence: (1) assistant message with a completed task launch part; (2) assistant message with a resume-request task part (input.task_id set to prior child session id — OMO reuse-by-alias/task_id surface, dist/index.js:19352-19353); (3) a running task part. Prompt bodies redacted.",
+  "messages": [
+    {
+      "info": {
+        "agent": "orchestrator",
+        "id": "msg_sample00000000000010",
+        "role": "assistant",
+        "sessionID": "ses_parent00000000000000000",
+        "time": { "created": 1786493280000, "completed": 1786493620000 }
+      },
+      "parts": [
+        {
+          "type": "text",
+          "id": "prt_sample00000000000010",
+          "messageID": "msg_sample00000000000010",
+          "sessionID": "ses_parent00000000000000000",
+          "text": "<sample-assistant-text-redacted>",
+          "time": { "start": 1786493280100, "end": 1786493282000 }
+        },
+        {
+          "type": "tool",
+          "tool": "task",
+          "callID": "call_sample0000000010",
+          "id": "prt_sample00000000000011",
+          "messageID": "msg_sample00000000000010",
+          "sessionID": "ses_parent00000000000000000",
+          "state": {
+            "input": {
+              "description": "Sample launch description",
+              "prompt": "<sample-prompt-redacted>",
+              "subagent_type": "explorer"
+            },
+            "metadata": {
+              "parentSessionId": "ses_parent00000000000000000",
+              "sessionId": "ses_child00000000000000001",
+              "model": { "providerID": "sample-provider", "modelID": "sample-model" },
+              "truncated": false
+            },
+            "output": "<task id=\"ses_child00000000000000001\" state=\"completed\">\n<task_result>\nSample result body for launch.\n</task_result>\n</task>",
+            "status": "completed",
+            "time": { "start": 1786493282899, "end": 1786493433039 },
+            "title": "Sample launch description"
+          }
+        }
+      ]
+    },
+    {
+      "info": {
+        "agent": "orchestrator",
+        "id": "msg_sample00000000000011",
+        "role": "assistant",
+        "sessionID": "ses_parent00000000000000000",
+        "time": { "created": 1786494000000, "completed": 1786494400000 }
+      },
+      "parts": [
+        {
+          "type": "tool",
+          "tool": "task",
+          "callID": "call_sample0000000011",
+          "id": "prt_sample00000000000012",
+          "messageID": "msg_sample00000000000011",
+          "sessionID": "ses_parent00000000000000000",
+          "state": {
+            "input": {
+              "description": "Sample resume follow-up",
+              "prompt": "<sample-prompt-redacted>",
+              "subagent_type": "explorer",
+              "task_id": "ses_child00000000000000001"
+            },
+            "metadata": {
+              "parentSessionId": "ses_parent00000000000000000",
+              "sessionId": "ses_child00000000000000001",
+              "model": { "providerID": "sample-provider", "modelID": "sample-model" },
+              "truncated": false
+            },
+            "output": "<task id=\"ses_child00000000000000001\" state=\"completed\">\n<task_result>\nSample follow-up result.\n</task_result>\n</task>",
+            "status": "completed",
+            "time": { "start": 1786494010000, "end": 1786494300000 },
+            "title": "Sample resume follow-up"
+          }
+        }
+      ]
+    },
+    {
+      "info": {
+        "agent": "orchestrator",
+        "id": "msg_sample00000000000012",
+        "role": "assistant",
+        "sessionID": "ses_parent00000000000000000",
+        "time": { "created": 1786495000000 }
+      },
+      "parts": [
+        {
+          "type": "tool",
+          "tool": "task",
+          "callID": "call_sample0000000012",
+          "id": "prt_sample00000000000013",
+          "messageID": "msg_sample00000000000012",
+          "sessionID": "ses_parent00000000000000000",
+          "state": {
+            "input": {
+              "description": "Sample running lane",
+              "prompt": "<sample-prompt-redacted>",
+              "subagent_type": "fixer"
+            },
+            "metadata": {
+              "parentSessionId": "ses_parent00000000000000000",
+              "sessionId": "ses_child00000000000000002",
+              "model": { "providerID": "sample-provider", "modelID": "sample-model" }
+            },
+            "status": "running",
+            "time": { "start": 1786495010000 },
+            "title": "Sample running lane"
+          }
+        }
+      ]
+    }
+  ]
+}

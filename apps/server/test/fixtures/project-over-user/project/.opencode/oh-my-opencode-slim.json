@@ -1,0 +1,11 @@
+{
+  "agents": {
+    "explorer": {
+      "skills": ["project-skill"],
+      "temperature": 0.1
+    }
+  },
+  "backgroundJobs": {
+    "maxContextLines": 999
+  }
+}

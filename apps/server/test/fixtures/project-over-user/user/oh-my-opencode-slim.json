@@ -1,0 +1,15 @@
+{
+  "preset": "p1",
+  "presets": {
+    "p1": {
+      "explorer": { "model": "preset/ex", "skills": ["from-preset"] }
+    }
+  },
+  "agents": {
+    "explorer": { "skills": ["user-skill"] }
+  },
+  "backgroundJobs": {
+    "maxSessionsPerAgent": 2,
+    "maxContextLines": 500
+  }
+}

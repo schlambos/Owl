@@ -1,0 +1,17 @@
+/*
+  Cascade:
+    legacy         — shared workspace fallbacks (styles.css)
+    omo.tokens     — primitive + semantic tokens
+    omo.primitives — shared controls
+    omo.components — shell / chrome
+    omo.pages      — Overview (imported here); other pages import
+                     their own unlayered stylesheets so they win
+                     over the shared fallbacks without specificity games.
+*/
+@layer legacy, omo.tokens, omo.primitives, omo.components, omo.pages;
+
+@import "../styles.css" layer(legacy);
+@import "./tokens.css" layer(omo.tokens);
+@import "./primitives.css" layer(omo.primitives);
+@import "./shell.css" layer(omo.components);
+@import "./overview.css" layer(omo.pages);

@@ -1,0 +1,658 @@
+/*
+  Team roster production overlay.
+
+  Imported AFTER agents.css from AgentsPage. Additive only — drawer/modal
+  rules in agents.css are untouched. Tokens only; both themes.
+*/
+
+/* ── Legend ─────────────────────────────────────────────────────── */
+
+.team-roster-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--omo-space-2) var(--omo-space-5);
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  line-height: 1.4;
+}
+
+.team-roster-legend-title {
+  font-size: var(--omo-text-xs);
+  font-weight: 650;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.team-roster-legend strong {
+  font-weight: 650;
+  color: var(--omo-text);
+}
+
+/* ── Toolbar / sort / tracked ───────────────────────────────────── */
+
+.team-roster-toolbar {
+  align-items: center;
+}
+
+.team-roster-toolbar .agents-search {
+  flex: 1 1 280px;
+  min-width: 240px;
+}
+
+.team-roster-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.team-roster-sort-label {
+  font-size: var(--omo-text-xs);
+  font-weight: 650;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.team-roster-sort-select {
+  min-height: 32px;
+  padding: 0 28px 0 10px;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  box-shadow: var(--omo-shadow-sm);
+  cursor: pointer;
+}
+
+.team-roster-sort-select:focus-visible,
+.team-roster-sort-dir:focus-visible,
+.team-roster-legend a:focus-visible,
+.team-observer-note a:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+}
+
+.team-roster-sort-dir {
+  min-height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.team-roster-sort-dir:hover {
+  color: var(--omo-text);
+  border-color: var(--omo-border-strong);
+}
+
+.team-roster-tracked {
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  white-space: nowrap;
+}
+
+.team-roster-tracked .summary-num {
+  font-family: var(--omo-font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text);
+}
+
+/* ── Group headers ──────────────────────────────────────────────── */
+
+.team-roster-table .team-roster-group th {
+  position: static;
+  padding: 8px 12px 6px;
+  background: var(--omo-surface-muted);
+  border-bottom: 1px solid var(--omo-border);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text);
+  white-space: normal;
+}
+
+.team-roster-group-label {
+  font-size: var(--omo-text-sm);
+  font-weight: 650;
+  color: var(--omo-text);
+}
+
+.team-roster-group-count,
+.team-roster-group-source {
+  font-size: var(--omo-text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--omo-text-muted);
+}
+
+.team-roster-table tbody tr.team-roster-group:hover th {
+  background: var(--omo-surface-muted);
+}
+
+/* ── Model scan: display first, provider second, id quiet ───────── */
+
+.team-roster-table .agent-name-btn {
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.team-roster-table .model-provider {
+  font-family: var(--omo-font-sans);
+  font-weight: 550;
+  color: var(--omo-text-muted);
+}
+
+.team-roster-table .model-id {
+  font-family: var(--omo-font-mono);
+}
+
+.team-roster-table.aligned-row .model-cell,
+.team-roster-table .aligned-row .model-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+/* ── Alignment cues (non-color) ─────────────────────────────────── */
+
+.team-align-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.team-align-cue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 1px 0 1px 72px;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.team-align-cue.is-override {
+  color: var(--omo-warn);
+}
+
+.team-align-cue.is-drift {
+  color: var(--omo-action);
+}
+
+.team-align-symbol {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-sm);
+  line-height: 1;
+}
+
+.team-align-cue-text {
+  text-transform: none;
+}
+
+/* Compact aligned affordance — used only when a single model is shown. */
+.team-aligned-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-faint);
+}
+
+/* ── Status: blank when healthy / unprobed ──────────────────────── */
+
+.team-status-quiet {
+  display: block;
+  min-height: 0;
+}
+
+.team-status-cell {
+  min-width: 8ch;
+}
+
+/* ── Source: group-default suppression + focus paths ────────────── */
+
+/* Group-default rows collapse to a quiet "more" affordance instead of
+   repeating the shared source label — the group header states the
+   default and the button's accessible name carries the real source.
+   Hover/focus/expanded reveal a real target (never a blank one). */
+.team-roster-table .source-badge.is-suppressed {
+  color: var(--omo-text-faint);
+  background: transparent;
+  border-color: transparent;
+  padding: 1px 7px;
+}
+
+.team-roster-table .source-badge.is-suppressed .source-more {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-sm);
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+.team-roster-table .source-badge.is-suppressed:hover,
+.team-roster-table .source-badge.is-suppressed:focus-visible,
+.team-roster-table .source-badge.is-suppressed[aria-expanded="true"] {
+  color: var(--omo-text-muted);
+  border-color: var(--omo-border);
+  background: var(--omo-surface-muted);
+}
+
+/* Visible keyboard focus for every interactive roster control. */
+.team-roster-table .agent-name-btn:focus-visible,
+.team-roster-table .source-badge:focus-visible,
+.team-roster-table .fallback-count:focus-visible,
+.team-roster-table .signal-more:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+}
+
+/* Long canonical ids never blow out the row — truncate with ellipsis. */
+.team-roster-table .model-canonical {
+  min-width: 0;
+}
+
+/* ── Observer guidance ──────────────────────────────────────────── */
+
+.team-observer-note {
+  margin: 6px 0 0;
+  max-width: 36ch;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text-muted);
+  line-height: 1.4;
+}
+
+.team-observer-note a {
+  color: var(--omo-action);
+  text-decoration: none;
+}
+
+.team-observer-note a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── ~1024: fold Source under Agent, keep the roster scannable ──── */
+
+@media (max-width: 1024px) {
+  .team-roster-surface {
+    overflow-x: hidden;
+  }
+
+  .team-roster-table,
+  .team-roster-table thead,
+  .team-roster-table tbody {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .team-roster-table thead tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+    column-gap: 8px;
+  }
+
+  .team-roster-table thead th[data-column="source"] {
+    display: none;
+  }
+
+  .team-roster-table tbody tr.team-roster-group {
+    display: block;
+  }
+
+  .team-roster-table tbody tr.team-roster-group th {
+    display: block;
+    width: 100%;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "agent model status actions"
+      "source model status actions";
+    column-gap: 8px;
+    align-items: start;
+    border-bottom: 1px solid var(--omo-border);
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td {
+    border-bottom: none;
+    padding: 8px 10px 2px;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td.team-agent-col {
+    grid-area: agent;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td.team-model-col {
+    grid-area: model;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td.team-status-col {
+    grid-area: status;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td.team-source-col {
+    grid-area: source;
+    padding: 0 10px 10px;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) td.team-actions-col {
+    grid-area: actions;
+  }
+
+  .team-align-cue {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .team-roster-toolbar .agents-search {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .team-roster-table tbody tr:not(.team-roster-group) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "agent actions"
+      "model model"
+      "status status"
+      "source source";
+  }
+
+  .team-roster-table thead {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-roster-sort-select,
+  .team-roster-sort-dir,
+  .team-roster-table tbody tr {
+    transition: none;
+  }
+}
+
+/* ── Team topology views follow-up (doc 34) ─────────────────────────
+
+   Dense, calm additions for the three route-backed Team views. Existing
+   tokens only; no new visual system. Shared table/toolbar classes come
+   from agents.css (imported by all three routes). */
+
+.team-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+/* Visible Clear focus — quiet, right-aligned in the toolbar. */
+.team-clear-focus {
+  margin-left: auto;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.team-clear-focus:hover {
+  color: var(--omo-text);
+  border-color: var(--omo-border-strong);
+}
+
+/* Separate disabled-shown count (never part of the header counts). */
+.team-disabled-shown {
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  white-space: nowrap;
+}
+
+.team-disabled-shown .summary-num {
+  font-family: var(--omo-font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text);
+}
+
+/* Effective model cross-nav links — quiet, underline on hover/focus. */
+.team-model-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-model-link:hover,
+.team-model-link:focus-visible {
+  color: var(--omo-action);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.model-primary-link {
+  font-weight: inherit;
+}
+
+/* Usage/dependency ref pills (Models + Providers rows). */
+.team-refs-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.team-ref {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    border-color var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.team-ref:hover {
+  border-color: var(--omo-border-strong);
+  color: var(--omo-text);
+}
+
+.team-ref.is-primary {
+  color: var(--omo-text);
+}
+
+.team-ref.is-council,
+.team-ref.is-acp {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+/* Runtime drift stays an annotation on the Effective ref (↻, text-labelled). */
+.team-ref-drift {
+  font-family: var(--omo-font-mono);
+  color: var(--omo-action);
+}
+
+/* Providers rows — compact expandable parents. */
+.team-provider-col {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.team-provider-toggle {
+  align-self: center;
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  color: var(--omo-text-faint);
+  cursor: pointer;
+}
+
+.team-provider-toggle:hover {
+  color: var(--omo-text);
+}
+
+.team-chev {
+  transition: transform var(--omo-motion-fast) var(--omo-ease);
+}
+
+.team-chev[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+.team-provider-name {
+  font-weight: 650;
+  color: var(--omo-text);
+}
+
+.team-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  white-space: nowrap;
+}
+
+/* Disclosure row — inset sheet with quiet column lists. */
+.team-provider-details-row > td {
+  background: var(--omo-surface-muted);
+}
+
+.team-provider-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--omo-space-3);
+  padding: 2px 0;
+}
+
+.team-provider-details section {
+  min-width: 0;
+}
+
+.team-provider-details h3 {
+  margin: 0 0 4px;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  color: var(--omo-text-faint);
+}
+
+.team-provider-details ul {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.team-provider-details li {
+  font-size: var(--omo-text-sm);
+  min-width: 0;
+}
+
+.team-provider-details a {
+  color: var(--omo-action);
+  text-decoration: none;
+}
+
+.team-provider-details a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.team-provider-details p {
+  margin: 0;
+  font-size: var(--omo-text-sm);
+}
+
+/* Drawer usage refs (ModelDrawer cross-nav). */
+.omo-drawer-ref {
+  color: var(--omo-action);
+  text-decoration: none;
+}
+
+.omo-drawer-ref:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Topology-empty states read as topology, not catalog. */
+.team-topology-empty {
+  text-align: left;
+}
+
+/* Visible keyboard focus for every new interactive element. */
+.team-clear-focus:focus-visible,
+.team-model-link:focus-visible,
+.team-ref:focus-visible,
+.team-provider-toggle:focus-visible,
+.omo-drawer-ref:focus-visible,
+.team-provider-details a:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+}
+
+@media (max-width: 1024px) {
+  .team-provider-details {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .team-provider-col {
+    flex-wrap: wrap;
+  }
+
+  .team-provider-details {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-chev,
+  .team-ref,
+  .team-model-link,
+  .team-clear-focus {
+    transition: none;
+  }
+}

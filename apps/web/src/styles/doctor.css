@@ -1,0 +1,684 @@
+/*
+  Doctor workspace — polished health/status management screen on the
+  Antigravity shell.
+
+  Imported from pages/DoctorPage.tsx (unlayered). The legacy stylesheet
+  lives in the `legacy` cascade layer, so every rule here wins without
+  specificity games; only Doctor-owned selectors and descendants of the
+  page root are touched.
+
+  Visual contract:
+   - ONE compact rounded summary strip on top (no card mosaic)
+   - segmented severity filter + compact category filter
+   - one rounded diagnostic list/table (severity icon + text, quiet
+     healthy, prominent problems) with a detail pane
+   - Desired / Effective / Live layers rendered as quiet mono panels
+   - remediation rendered as a blue action link
+   - semantic tokens only — both themes, no owned inline styles
+
+  Class contract (prefix omo-doc-):
+    omo-doc           page column
+    omo-doc-summary   single rounded summary strip (stat cells)
+    omo-doc-toolbar   filters row (category select + severity chips)
+    omo-doc-frame     rounded list/detail frame
+    omo-doc-sev       severity icon+text badge (data-sev drives tone)
+*/
+
+.omo-doc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-doc .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-2) var(--omo-space-3);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ── Compact summary strip (single surface, stat cells) ──────────── */
+
+.omo-doc-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.omo-doc-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--omo-space-3) var(--omo-space-4);
+}
+
+.omo-doc-stat:not(:first-child) {
+  border-left: 1px solid var(--omo-border);
+}
+
+.omo-doc-stat-label {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+.omo-doc-stat-value {
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-doc-stat-sub {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.omo-doc-stat-sub .omo-doc-count {
+  font-weight: 600;
+}
+
+.omo-doc-stat-sub .omo-doc-count.bad {
+  color: var(--omo-bad);
+}
+
+.omo-doc-stat-sub .omo-doc-count.warn {
+  color: var(--omo-warn);
+}
+
+.omo-doc-stat-sub .omo-doc-count.ok {
+  color: var(--omo-ok);
+}
+
+/* Backend cluster pills inside the OpenCode cell. */
+.omo-doc-backend-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.omo-doc .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.omo-doc .pill.ok {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.omo-doc .pill.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-doc .pill.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+/* Failure / restart lifecycle blocks live inside the summary cell. */
+.omo-doc .omo-doc-failure {
+  margin-top: var(--omo-space-2);
+  padding: var(--omo-space-2) var(--omo-space-3);
+  border-radius: var(--omo-radius-sm);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-doc .omo-doc-failure[data-mode="managed"] {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+}
+
+.omo-doc .omo-doc-failure[data-mode="attach"] {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+}
+
+.omo-doc .omo-doc-failure .omo-doc-failure-msg {
+  margin: var(--omo-space-1) 0 0;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc .omo-doc-failure .omo-doc-failure-action {
+  margin: var(--omo-space-1) 0 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc .omo-doc-failure .toolbar {
+  display: flex;
+  gap: var(--omo-space-2);
+  margin: var(--omo-space-2) 0 0;
+}
+
+.omo-doc .omo-doc-failure .muted {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc .omo-doc-restarting {
+  margin: var(--omo-space-2) 0 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+  overflow-wrap: anywhere;
+}
+
+/* ── Filters: segmented severity + compact category select ───────── */
+
+.omo-doc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-doc-select {
+  min-height: 32px;
+  padding: 0 var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+  max-width: 220px;
+  min-width: 0;
+}
+
+.omo-doc-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 3px;
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-pill);
+}
+
+.omo-doc-seg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-doc-seg-item:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-doc-seg-item[aria-pressed="true"] {
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  border-color: var(--omo-border);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-doc-seg-item .count {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text-faint);
+}
+
+.omo-doc-seg-item[aria-pressed="true"] .count {
+  color: var(--omo-text-muted);
+}
+
+.omo-doc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.omo-doc-toggle input {
+  accent-color: var(--omo-action);
+  margin: 0;
+}
+
+/* ── Diagnostic list / detail frame ──────────────────────────────── */
+
+.omo-doc-frame {
+  display: grid;
+  grid-template-columns: minmax(360px, 480px) minmax(0, 1fr);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.omo-doc-list {
+  min-width: 0;
+  max-height: calc(100vh - 300px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+}
+
+.omo-doc-list table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-doc-list table.data th,
+.omo-doc-list table.data td {
+  text-align: left;
+  vertical-align: top;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-doc-list table.data tr:last-child td {
+  border-bottom: none;
+}
+
+.omo-doc-list table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.omo-doc-list table.data tbody tr {
+  cursor: pointer;
+  transition: background var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-doc-list table.data tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-doc-list table.data tbody tr:focus-visible td {
+  background: var(--omo-action-soft);
+}
+
+.omo-doc-list table.data tbody tr[aria-current="true"] td {
+  background: var(--omo-action-soft);
+  box-shadow: inset 2px 0 0 var(--omo-action);
+}
+
+.omo-doc-list table.data td.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc-list .muted {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-doc-list .omo-doc-empty {
+  padding: var(--omo-space-4);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-doc-cell-title {
+  min-width: 0;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+/* Severity: icon + text; tone never carried by color alone. */
+.omo-doc-sev {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  color: var(--omo-text-muted);
+}
+
+.omo-doc-sev svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.omo-doc-sev[data-sev="error"] {
+  color: var(--omo-bad);
+}
+
+.omo-doc-sev[data-sev="warning"] {
+  color: var(--omo-warn);
+}
+
+.omo-doc-sev[data-sev="healthy"] {
+  color: var(--omo-ok);
+  font-weight: 500;
+}
+
+/* ── Detail pane ─────────────────────────────────────────────────── */
+
+.omo-doc-pane {
+  min-width: 0;
+  padding: var(--omo-space-4) var(--omo-space-5) var(--omo-space-8);
+  overflow: auto;
+  max-height: calc(100vh - 300px);
+  overscroll-behavior: contain;
+}
+
+.omo-doc-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  color: var(--omo-text-muted);
+}
+
+.omo-doc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-doc-detail-title {
+  margin: 0;
+  font-size: var(--omo-text-xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-doc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.omo-doc-badges .mono,
+.omo-doc-badges .pill.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc-summary-text {
+  margin: 0;
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-doc .section-title {
+  margin: var(--omo-space-2) 0 var(--omo-space-1);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+/* Desired / Effective / Live layers — quiet labeled mono panels. */
+.omo-doc-layer {
+  min-width: 0;
+}
+
+.omo-doc-layer .msg-pre {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: var(--omo-leading);
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--omo-canvas);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  padding: var(--omo-space-3);
+}
+
+.omo-doc-layer .msg-pre.dim {
+  color: var(--omo-text-muted);
+}
+
+/* Evidence table — inset, quiet. */
+.omo-doc-evidence {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  overflow: auto;
+  background: var(--omo-surface-muted);
+  min-width: 0;
+}
+
+.omo-doc-evidence table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-doc-evidence table.data th,
+.omo-doc-evidence table.data td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-doc-evidence table.data tr:last-child td {
+  border-bottom: none;
+}
+
+.omo-doc-evidence table.data td.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-doc-evidence table.data th {
+  color: var(--omo-text-faint);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+}
+
+/* Remediation — prominent blue action link. */
+.omo-doc .omo-doc-remedy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omo-space-2);
+  align-self: flex-start;
+  background: var(--omo-action);
+  border: 1px solid var(--omo-action);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-action-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  padding: 4px 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-doc .omo-doc-remedy:hover {
+  background: var(--omo-action-hover);
+  border-color: var(--omo-action-hover);
+}
+
+/* Retry button inside the failure block matches the button primitive. */
+.omo-doc .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  padding: 4px 10px;
+  line-height: 1.3;
+  box-shadow: var(--omo-shadow-sm);
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-doc .btn:hover:not(:disabled) {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border-strong);
+}
+
+.omo-doc .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Responsive: 1440 → 1000 → 768 ───────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .omo-doc-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .omo-doc-stat:nth-child(3) {
+    border-left: none;
+  }
+
+  .omo-doc-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--omo-border);
+  }
+
+  .omo-doc-frame {
+    grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .omo-doc-frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .omo-doc-list {
+    max-height: 320px;
+    border-right: none;
+    border-bottom: 1px solid var(--omo-border);
+  }
+
+  .omo-doc-pane {
+    max-height: none;
+  }
+
+  .omo-doc-toggle {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .omo-doc-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .omo-doc-stat:not(:first-child) {
+    border-left: none;
+    border-top: 1px solid var(--omo-border);
+  }
+
+  .omo-doc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-doc-select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .omo-doc-seg {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .omo-doc-toggle {
+    align-self: flex-start;
+  }
+
+  .omo-doc-pane {
+    padding: var(--omo-space-3) var(--omo-space-3) var(--omo-space-6);
+  }
+}

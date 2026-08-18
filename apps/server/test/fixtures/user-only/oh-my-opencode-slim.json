@@ -1,0 +1,34 @@
+{
+  "preset": "p1",
+  "presets": {
+    "p1": {
+      "explorer": {
+        "model": "preset/explorer",
+        "variant": "low",
+        "skills": ["a", "b"]
+      },
+      "oracle": {
+        "model": "preset/oracle",
+        "variant": "medium"
+      }
+    }
+  },
+  "agents": {
+    "oracle": {
+      "variant": "high"
+    },
+    "researcher": {
+      "model": "custom/researcher",
+      "prompt": "inline researcher"
+    }
+  },
+  "backgroundJobs": {
+    "maxSessionsPerAgent": 3,
+    "maxContextLines": 1000
+  },
+  "fallback": {
+    "enabled": true,
+    "maxRetries": 2
+  },
+  "unknownFutureKey": { "keep": true }
+}

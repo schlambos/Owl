@@ -1,0 +1,194 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Primitive */
+  --omo-white: #ffffff;
+  --omo-blue-500: #3b82f6;
+  --omo-blue-600: #2563eb;
+  --omo-blue-50: #eff6ff;
+  --omo-slate-25: #fafbfc;
+  --omo-slate-50: #f4f6f8;
+  --omo-slate-100: #e8ecf1;
+  --omo-slate-200: #d5dbe3;
+  --omo-slate-400: #8b95a3;
+  --omo-slate-500: #5b6573;
+  --omo-slate-800: #1a1f26;
+  --omo-sage-600: #3f8f6b;
+  --omo-sage-50: #f1f8f4;
+  --omo-amber-600: #c4851a;
+  --omo-amber-50: #fff8eb;
+  --omo-rose-600: #c4475a;
+  --omo-rose-50: #fdf2f4;
+
+  /* Semantic — surfaces */
+  --omo-canvas: var(--omo-slate-25);
+  --omo-surface: var(--omo-white);
+  --omo-surface-muted: var(--omo-slate-50);
+  --omo-surface-hover: #eef2f6;
+  --omo-surface-inverse: var(--omo-slate-800);
+
+  /* Semantic — text */
+  --omo-text: var(--omo-slate-800);
+  --omo-text-muted: var(--omo-slate-500);
+  --omo-text-faint: var(--omo-slate-400);
+  --omo-text-inverse: var(--omo-white);
+
+  /* Semantic — borders / focus / action */
+  --omo-border: #e4e8ee;
+  --omo-border-strong: var(--omo-slate-200);
+  --omo-focus: var(--omo-blue-500);
+  --omo-focus-ring: 0 0 0 2px var(--omo-canvas), 0 0 0 4px var(--omo-blue-500);
+  --omo-action: var(--omo-blue-500);
+  --omo-action-hover: var(--omo-blue-600);
+  --omo-action-soft: var(--omo-blue-50);
+  --omo-action-text: var(--omo-white);
+
+  /* Semantic — status (quiet healthy) */
+  --omo-ok: var(--omo-sage-600);
+  --omo-ok-bg: var(--omo-sage-50);
+  --omo-ok-border: #cfe4d8;
+  --omo-warn: var(--omo-amber-600);
+  --omo-warn-bg: var(--omo-amber-50);
+  --omo-warn-border: #eed9ad;
+  --omo-bad: var(--omo-rose-600);
+  --omo-bad-bg: var(--omo-rose-50);
+  --omo-bad-border: #efc5cc;
+
+  /* Elevation */
+  --omo-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --omo-shadow: 0 1px 2px rgba(16, 24, 40, 0.04),
+    0 6px 16px rgba(16, 24, 40, 0.045);
+  --omo-shadow-pop: 0 8px 28px rgba(16, 24, 40, 0.1),
+    0 1px 2px rgba(16, 24, 40, 0.04);
+
+  /* Radii */
+  --omo-radius-sm: 8px;
+  --omo-radius-md: 10px;
+  --omo-radius-lg: 14px;
+  --omo-radius-xl: 16px;
+  --omo-radius-pill: 999px;
+
+  /* Spacing */
+  --omo-space-1: 4px;
+  --omo-space-2: 8px;
+  --omo-space-3: 12px;
+  --omo-space-4: 16px;
+  --omo-space-5: 20px;
+  --omo-space-6: 24px;
+  --omo-space-8: 32px;
+  --omo-space-10: 40px;
+
+  /* Type */
+  --omo-font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --omo-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --omo-text-xs: 11px;
+  --omo-text-sm: 12px;
+  --omo-text-md: 13px;
+  --omo-text-lg: 15px;
+  --omo-text-xl: 18px;
+  --omo-text-2xl: 22px;
+  --omo-text-metric: 28px;
+  --omo-leading: 1.45;
+  --omo-tracking-label: 0.04em;
+
+  /* Z / motion */
+  --omo-z-header: 40;
+  --omo-z-popover: 60;
+  --omo-z-skip: 100;
+  --omo-motion-fast: 120ms;
+  --omo-motion-med: 180ms;
+  --omo-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Legacy aliases so unmigrated pages follow the theme */
+  --bg: var(--omo-canvas);
+  --bg-elev: var(--omo-surface);
+  --bg-row: var(--omo-surface-muted);
+  --border: var(--omo-border);
+  --border-strong: var(--omo-border-strong);
+  --text: var(--omo-text);
+  --text-dim: var(--omo-text-muted);
+  --text-faint: var(--omo-text-faint);
+  --accent: var(--omo-action);
+  --ok: var(--omo-ok);
+  --warn: var(--omo-warn);
+  --bad: var(--omo-bad);
+  --drift: var(--omo-warn);
+  --sans: var(--omo-font-sans);
+  --mono: var(--omo-font-mono);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --omo-canvas: #15191e;
+  --omo-surface: #1d232a;
+  --omo-surface-muted: #232a33;
+  --omo-surface-hover: #2a323c;
+  --omo-surface-inverse: #e8ecf1;
+
+  --omo-text: #e8ecf1;
+  --omo-text-muted: #9aa3b0;
+  --omo-text-faint: #6b7380;
+  --omo-text-inverse: #15191e;
+
+  --omo-border: #2c343e;
+  --omo-border-strong: #3a4450;
+  --omo-focus: #60a5fa;
+  --omo-focus-ring: 0 0 0 2px var(--omo-canvas), 0 0 0 4px #60a5fa;
+  --omo-action: #3b82f6;
+  --omo-action-hover: #60a5fa;
+  --omo-action-soft: #1b2a44;
+  --omo-action-text: #ffffff;
+
+  --omo-ok: #5aa882;
+  --omo-ok-bg: #1a2a22;
+  --omo-ok-border: #2a4438;
+  --omo-warn: #d4a24a;
+  --omo-warn-bg: #2a2316;
+  --omo-warn-border: #4a3c1e;
+  --omo-bad: #d46a78;
+  --omo-bad-bg: #2a1a1e;
+  --omo-bad-border: #4a2a30;
+
+  --omo-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --omo-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 8px 20px rgba(0, 0, 0, 0.22);
+  --omo-shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.36),
+    0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--omo-canvas);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-md);
+  line-height: var(--omo-leading);
+}
+
+html {
+  overflow-x: clip;
+}
+
+body {
+  overflow-x: clip;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --omo-motion-fast: 0.01ms;
+    --omo-motion-med: 0.01ms;
+  }
+}

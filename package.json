@@ -1,0 +1,16 @@
+{
+  "name": "omo-control-plane",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "bun run scripts/dev-supervisor.ts",
+    "dev:server": "bun run --filter @omo/server dev",
+    "dev:web": "bun run --filter @omo/web dev",
+    "build": "bun run --filter @omo/shared build && bun run --filter @omo/server build && bun run --filter @omo/web build",
+    "typecheck": "bun run --filter @omo/shared typecheck && bun run --filter @omo/server typecheck && bun run --filter @omo/web typecheck",
+    "audit:omo-schema": "bun run scripts/audit-installed-omo-schema.ts",
+    "test:telemetry-bridge": "bun run --filter @omo/telemetry-bridge test",
+    "typecheck:telemetry-bridge": "bun run --filter @omo/telemetry-bridge typecheck"
+  }
+}

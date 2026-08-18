@@ -1,0 +1,27 @@
+{
+  "_comment": "REAL anonymized capture (2026-08-11) of OMO-related metadata-bearing parts that PERSIST in GET /session/:id/message. Verified live: (1) task tool parts persist state.metadata {parentSessionId, sessionId, model, truncated?}; (2) synthetic compaction-continue text parts persist metadata.compaction_continue. NOT persisted live (transient prompt-transform parts): oh-my-opencode-slim.backgroundJobBoard board snapshots (dist/index.js:27258), oh-my-opencode-slim.internalInitiator synthetic parts (dist/index.js:25849-25857, createInternalAgentTextPart dist/index.js:25850), oh-my-opencode-slim.phaseReminder (dist/index.js:26986). No council composition metadata key exists in installed dist (grepped Symbol.for/metadataKey/metadata: around council code) — none verified.",
+  "persistedTaskToolMetadata": {
+    "parentSessionId": "ses_parent00000000000000000",
+    "sessionId": "ses_child00000000000000001",
+    "model": { "providerID": "sample-provider", "modelID": "sample-model" },
+    "truncated": false
+  },
+  "persistedCompactionContinuePart": {
+    "type": "text",
+    "synthetic": true,
+    "text": "<sample-compaction-continue-text-redacted>",
+    "metadata": { "compaction_continue": true }
+  },
+  "transientExamplesNotPersisted": [
+    {
+      "key": "oh-my-opencode-slim.backgroundJobBoard",
+      "citation": "dist/index.js:27258",
+      "note": "board-injection anchor marker; injected via prompt transform, stripped before persistence"
+    },
+    {
+      "key": "oh-my-opencode-slim.internalInitiator",
+      "citation": "dist/index.js:25849",
+      "note": "createInternalAgentTextPart tags synthetic parts; also SLIM_INTERNAL_INITIATOR_MARKER html comment in text (dist/index.js:25848)"
+    }
+  ]
+}

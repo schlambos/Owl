@@ -1,0 +1,692 @@
+/*
+  Council / ACP workspaces — Antigravity list/detail management surface.
+
+  Imported from pages/CouncilPage.tsx and pages/AcpPage.tsx (unlayered).
+  The legacy stylesheet lives in the `legacy` cascade layer, so every rule
+  here wins without specificity games; only specialists-owned selectors
+  and descendants of the two page roots are touched.
+
+  Visual contract (mirrors Sessions/Agents surfaces):
+   - one rounded master/detail frame: quiet side list + detail pane
+   - compact search/create affordances where semantics already exist
+   - readable identity (sans) + technical metadata (mono only)
+   - quiet healthy states, prominent problems (warn/bad)
+   - one rounded table surface for members/sessions
+   - semantic tokens only — both themes, no owned inline styles
+
+  Class contract (prefix omo-spec-):
+    omo-spec            page column (header, banners, frame, tables)
+    omo-spec-frame      rounded outer surface, master/detail grid
+    omo-spec-side       quiet master column (search, list, create form)
+    omo-spec-row        selectable list row (aria-current = selected)
+    omo-spec-pane       detail scroll region
+*/
+
+.omo-spec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-4);
+  min-width: 0;
+}
+
+/* ── Banners ─────────────────────────────────────────────────────── */
+
+.omo-spec .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-2) var(--omo-space-3);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-spec-warn {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+  padding: var(--omo-space-2) var(--omo-space-3);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ── Explainer panel (coordinator note / ACP wrapper note) ───────── */
+
+.omo-spec-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-1);
+  margin: 0;
+  padding: var(--omo-space-3) var(--omo-space-4);
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  color: var(--omo-text-muted);
+  min-width: 0;
+}
+
+.omo-spec-intro .omo-spec-intro-title {
+  margin: 0;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-spec-intro p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.omo-spec-intro code {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text);
+}
+
+/* ── Master/detail frame ─────────────────────────────────────────── */
+
+.omo-spec-frame {
+  display: grid;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  min-height: 420px;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+}
+
+.omo-spec-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+  padding: var(--omo-space-3);
+  background: var(--omo-surface-muted);
+  border-right: 1px solid var(--omo-border);
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  overscroll-behavior: contain;
+}
+
+.omo-spec-pane {
+  min-width: 0;
+  padding: var(--omo-space-4) var(--omo-space-5) var(--omo-space-8);
+  overflow: auto;
+  max-height: calc(100vh - 220px);
+  overscroll-behavior: contain;
+}
+
+/* ── Side column: head, search, list, create ─────────────────────── */
+
+.omo-spec-side-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--omo-space-2);
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+.omo-spec-side-head .omo-spec-count {
+  font-family: var(--omo-font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--omo-text-faint);
+}
+
+.omo-spec-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 var(--omo-space-3);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-spec-input::placeholder {
+  color: var(--omo-text-faint);
+}
+
+.omo-spec-input.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-spec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.omo-spec-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-sm);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  line-height: 1.3;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-spec-row:hover {
+  background: var(--omo-surface-hover);
+}
+
+.omo-spec-row:focus-visible {
+  box-shadow: var(--omo-focus-ring);
+}
+
+.omo-spec-row[aria-current="true"] {
+  background: var(--omo-action-soft);
+  border-color: color-mix(in srgb, var(--omo-action) 28%, transparent);
+}
+
+.omo-spec-row[aria-current="true"] .omo-spec-row-title {
+  color: var(--omo-action);
+}
+
+.omo-spec-row-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.omo-spec-row-meta {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-spec-row-meta.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-spec-row-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.omo-spec-list-empty {
+  padding: var(--omo-space-2) var(--omo-space-1);
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-spec-create {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  padding-top: var(--omo-space-3);
+  border-top: 1px solid var(--omo-border);
+}
+
+.omo-spec-create .omo-spec-create-actions {
+  display: flex;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+/* ── Detail pane ─────────────────────────────────────────────────── */
+
+.omo-spec-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  color: var(--omo-text-muted);
+}
+
+.omo-spec-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  min-width: 0;
+  padding-bottom: var(--omo-space-3);
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-spec-head-text {
+  min-width: 0;
+}
+
+.omo-spec-title {
+  margin: 0;
+  font-size: var(--omo-text-xl);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-spec-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.omo-spec-head .toolbar {
+  display: flex;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.omo-spec-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  min-width: 0;
+  margin-top: var(--omo-space-3);
+}
+
+/* Restrained pills inside specialists surfaces. */
+.omo-spec .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.omo-spec .pill.ok {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.omo-spec .pill.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-spec .pill.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+/* Section titles. */
+.omo-spec .section-title {
+  margin: var(--omo-space-2) 0 var(--omo-space-1);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+/* Key/value blocks (ACP detail, handshake results). */
+.omo-spec .row-kv {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 5px var(--omo-space-3);
+  margin: 0;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-spec .row-kv dt {
+  color: var(--omo-text-faint);
+}
+
+.omo-spec .row-kv dd {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  color: var(--omo-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Human-readable dd values stay sans — mono is for technical content. */
+.omo-spec .row-kv dd.omo-spec-kv-sans {
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+}
+
+/* Pills inline after a mono value (command resolution, cwd scope). */
+.omo-spec .omo-spec-inline-pill {
+  margin-left: 8px;
+}
+
+/* Mono payload blocks (raw desired, stderr). */
+.omo-spec .msg-pre {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: var(--omo-leading);
+  max-height: 420px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--omo-canvas);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  padding: var(--omo-space-3);
+}
+
+.omo-spec .msg-pre.dim {
+  color: var(--omo-text-muted);
+}
+
+/* Inset panels inside the detail pane (add-member, handshake probe). */
+.omo-spec-panel {
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  min-width: 0;
+}
+
+.omo-spec-panel h3 {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-spec-form-row {
+  display: flex;
+  gap: var(--omo-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.omo-spec-form-row .omo-spec-input {
+  flex: 1 1 140px;
+}
+
+.omo-spec-form-row .omo-spec-input.mono {
+  flex: 2 1 200px;
+}
+
+/* ── One rounded table surface (members, sessions) ────────────────── */
+
+.omo-spec-table-wrap {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--omo-surface);
+  box-shadow: var(--omo-shadow);
+  min-width: 0;
+}
+
+.omo-spec table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-spec table.data th,
+.omo-spec table.data td {
+  text-align: left;
+  vertical-align: top;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-spec table.data tr:last-child td {
+  border-bottom: none;
+}
+
+.omo-spec table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-faint);
+  font-weight: 600;
+  font-size: var(--omo-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--omo-tracking-label);
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.omo-spec table.data tbody tr {
+  transition: background var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-spec table.data tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-spec table.data td.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-spec .muted {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* Problem rows in the member table get a quiet accent edge. */
+.omo-spec table.data tr.omo-spec-row-problem td:first-child {
+  box-shadow: inset 2px 0 0 var(--omo-warn);
+}
+
+/* Member name + warning stack. */
+.omo-spec-member-name {
+  font-weight: 600;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-spec-member-warn {
+  margin: 0;
+  padding-left: 14px;
+  font-size: var(--omo-text-xs);
+  color: var(--omo-warn);
+}
+
+/* ── Probe evidence — quiet healthy, prominent problems ──────────── */
+
+.omo-spec .probe-badge {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+  color: var(--omo-text-muted);
+}
+
+.omo-spec .probe-badge.ok {
+  color: var(--omo-ok);
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.omo-spec .probe-badge.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+.omo-spec .probe-badge.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-spec .probe-badge.muted {
+  color: var(--omo-text-muted);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+}
+
+.omo-spec .probe-badge.run {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.omo-spec .probe-freshness {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+  font-size: 10px;
+}
+
+/* Members of non-default (inactive) presets are reduced-emphasis. */
+.omo-spec .probe-dim {
+  opacity: 0.55;
+}
+
+/* ── Buttons inside specialists surfaces ─────────────────────────── */
+
+.omo-spec .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  padding: 4px 10px;
+  line-height: 1.3;
+  box-shadow: var(--omo-shadow-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-spec .btn:hover:not(:disabled) {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border-strong);
+}
+
+.omo-spec .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.omo-spec .btn.btn-xs {
+  padding: 2px 8px;
+  font-size: var(--omo-text-xs);
+  box-shadow: none;
+}
+
+.omo-spec .btn.btn-primary {
+  background: var(--omo-action);
+  border-color: var(--omo-action);
+  color: var(--omo-action-text);
+}
+
+.omo-spec .btn.btn-primary:hover:not(:disabled) {
+  background: var(--omo-action-hover);
+  border-color: var(--omo-action-hover);
+}
+
+/* ── Responsive: 1440 → 1000 → 768 ───────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .omo-spec-frame {
+    grid-template-columns: minmax(210px, 250px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 999px) {
+  .omo-spec-frame {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .omo-spec-side {
+    max-height: 300px;
+    border-right: none;
+    border-bottom: 1px solid var(--omo-border);
+  }
+
+  .omo-spec-pane {
+    max-height: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .omo-spec-pane {
+    padding: var(--omo-space-3) var(--omo-space-3) var(--omo-space-6);
+  }
+
+  .omo-spec-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-spec .row-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .omo-spec table.data th,
+  .omo-spec table.data td {
+    padding: 6px 8px;
+  }
+
+  .omo-spec-form-row .omo-spec-input,
+  .omo-spec-form-row .omo-spec-input.mono {
+    flex: 1 1 100%;
+  }
+}

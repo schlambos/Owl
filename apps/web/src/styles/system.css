@@ -1,0 +1,935 @@
+/*
+  System workspace — Antigravity Settings / API Proxy treatment.
+
+  Imported from pages/SystemPage.tsx (unlayered). Legacy styles live in the
+  `legacy` cascade layer, so every rule here wins without specificity games.
+
+  Visual contract:
+   - short Settings-style group track (4 groups)
+   - one large section surface with an in-sheet mini-index
+   - inset setting rows (title / description / control)
+   - modern switches
+   - Apply is primary, Refresh / Preview / Cancel stay secondary
+   - destructive service stop stays semantic red only when destructive
+   - API Proxy service header for lifecycle + telemetry
+   - technical telemetry accessible, not dominant
+   - semantic tokens only — both themes
+   - sans for UI, mono for technical ids/paths/payloads
+   - responsive 1440 / 1000 / 768 — no wrapping pill stacks at 768
+ */
+
+/* ── Page shell ─────────────────────────────────────────────────────── */
+
+.omo-system {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-5);
+  min-width: 0;
+}
+
+.omo-system .error,
+.omo-system .warn-block,
+.omo-system .info-block {
+  margin: 0;
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-system .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  font-family: var(--omo-font-sans);
+}
+
+.omo-system .warn-block {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+}
+
+.omo-system .info-block {
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+}
+
+.omo-sys-quiet {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Secondary group track (Settings-style, 4 groups) ───────────────── */
+
+.omo-sys-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.omo-sys-nav-track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.omo-sys-nav-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-pill);
+  background: transparent;
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-sys-nav-item:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-sys-nav-item[aria-current="page"],
+.omo-sys-nav-item[aria-selected="true"] {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.omo-sys-nav-item:focus-visible,
+.omo-sys-index-item:focus-visible {
+  outline: 2px solid var(--omo-action);
+  outline-offset: 2px;
+}
+
+/* ── One large section surface ──────────────────────────────────────── */
+
+.omo-sys-sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow);
+  overflow: hidden;
+}
+
+.omo-sys-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  padding: var(--omo-space-3) var(--omo-space-5);
+  border-bottom: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+}
+
+.omo-sys-index {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.omo-sys-index-label {
+  flex: none;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-sys-index-track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.omo-sys-index-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--omo-radius-pill);
+  background: transparent;
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-sys-index-item:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-sys-index-item[aria-current="page"],
+.omo-sys-index-item[aria-selected="true"] {
+  color: var(--omo-text);
+  background: var(--omo-surface);
+  border-color: var(--omo-border);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-sys-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-sys-scope-label {
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-sys-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  padding: var(--omo-space-2) 0 var(--omo-space-6);
+}
+
+.omo-sys-body > .error,
+.omo-sys-body > .warn-block,
+.omo-sys-body > .info-block,
+.omo-sys-body > .omo-sys-quiet {
+  margin: var(--omo-space-3) var(--omo-space-5) 0;
+}
+
+/* ── Service / status header (API Proxy) ────────────────────────────── */
+
+.omo-sys-service,
+.omo-sys-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--omo-space-4);
+  padding: var(--omo-space-5) var(--omo-space-5) var(--omo-space-4);
+}
+
+.omo-sys-service-copy,
+.omo-sys-intro-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.omo-sys-service-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2) var(--omo-space-3);
+}
+
+.omo-sys-service-title,
+.omo-sys-intro-title {
+  margin: 0;
+  font-size: var(--omo-text-xl);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  color: var(--omo-text);
+  text-transform: none;
+}
+
+.omo-sys-service-badges,
+.omo-sys-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.omo-sys-service-desc,
+.omo-sys-intro-desc,
+.omo-sys-group-desc {
+  margin: 6px 0 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  max-width: 62ch;
+}
+
+.omo-sys-service-meta {
+  margin-top: 6px;
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-sys-service-actions,
+.omo-sys-intro-actions,
+.omo-sys-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex: none;
+}
+
+/* ── Groups + inset rows ────────────────────────────────────────────── */
+
+.omo-sys-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0 var(--omo-space-5);
+}
+
+.omo-sys-group + .omo-sys-group,
+.omo-sys-group + .omo-sys-tech,
+.omo-sys-tech + .omo-sys-group {
+  margin-top: var(--omo-space-2);
+}
+
+.omo-sys-group-head {
+  padding: var(--omo-space-4) 0 var(--omo-space-2);
+}
+
+.omo-sys-group-title {
+  margin: 0;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-sys-group-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--omo-surface-muted);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  overflow: hidden;
+}
+
+.omo-sys-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--omo-space-4);
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-sys-row:last-child {
+  border-bottom: 0;
+}
+
+.omo-sys-row-stacked {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.omo-sys-row-copy {
+  min-width: 0;
+}
+
+.omo-sys-row-title {
+  color: var(--omo-text);
+  font-size: var(--omo-text-md);
+  font-weight: 550;
+}
+
+.omo-sys-row-desc {
+  margin-top: 3px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.omo-sys-row-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-sys-value {
+  color: var(--omo-text);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+  text-align: right;
+}
+
+.omo-system .mono,
+.omo-system .omo-mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.omo-sys-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--omo-border);
+}
+
+.omo-sys-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--omo-space-4);
+  background: var(--omo-surface-muted);
+}
+
+.omo-sys-metric-label {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+.omo-sys-metric-value {
+  color: var(--omo-text);
+  font-size: var(--omo-text-xl);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.omo-sys-metric-sub {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  overflow-wrap: anywhere;
+}
+
+/* ── Switch ─────────────────────────────────────────────────────────── */
+
+.omo-sys-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-pill);
+  background: var(--omo-surface-hover);
+  cursor: pointer;
+  transition:
+    background var(--omo-motion-fast) var(--omo-ease),
+    border-color var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-sys-switch.is-on {
+  background: var(--omo-action);
+  border-color: var(--omo-action);
+}
+
+.omo-sys-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.omo-sys-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--omo-surface);
+  box-shadow: var(--omo-shadow-sm);
+  transition: transform var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-sys-switch.is-on .omo-sys-switch-thumb {
+  transform: translateX(16px);
+}
+
+/* ── Controls ───────────────────────────────────────────────────────── */
+
+.omo-system .omo-btn {
+  min-height: 32px;
+}
+
+.omo-system .omo-btn-danger {
+  background: var(--omo-bad);
+  color: var(--omo-surface);
+  border-color: var(--omo-bad);
+}
+
+.omo-system .omo-btn-danger:hover:not(:disabled) {
+  background: var(--omo-bad);
+  border-color: var(--omo-bad);
+  filter: brightness(0.94);
+}
+
+.omo-sys-select,
+.omo-system input:not([type="checkbox"]):not([type="radio"]),
+.omo-system select,
+.omo-system textarea {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-system input.mono,
+.omo-system textarea.mono,
+.omo-system select.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-system input[type="number"] {
+  width: 7.5rem;
+}
+
+.omo-sys-input-wide,
+.omo-system input[type="text"],
+.omo-system textarea {
+  width: min(100%, 28rem);
+}
+
+.omo-system textarea {
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+/* ── Badges (token restyle of shared pills) ─────────────────────────── */
+
+.omo-system .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface);
+  color: var(--omo-text-muted);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.omo-system .pill.ok {
+  color: var(--omo-ok);
+  background: var(--omo-ok-bg);
+  border-color: var(--omo-ok-border);
+}
+
+.omo-system .pill.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-system .pill.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+/* ── Tables (technical, inset) ──────────────────────────────────────── */
+
+.omo-system .table-wrap {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: auto;
+}
+
+.omo-system table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-system table.data th,
+.omo-system table.data td {
+  text-align: left;
+  padding: 10px 16px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-system table.data tr:last-child td {
+  border-bottom: 0;
+}
+
+.omo-system table.data th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface);
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+.omo-system table.data tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-system table.data td.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+/* ── Definition lists ───────────────────────────────────────────────── */
+
+.omo-system .row-kv {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-system .row-kv dt {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-sans);
+}
+
+.omo-system .row-kv dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--omo-text);
+  overflow-wrap: anywhere;
+}
+
+.omo-system .row-kv dd.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+/* ── Technical disclosure ───────────────────────────────────────────── */
+
+.omo-sys-tech {
+  margin: var(--omo-space-4) var(--omo-space-5) 0;
+  padding-top: var(--omo-space-3);
+  border-top: 1px solid var(--omo-border);
+}
+
+.omo-sys-tech summary {
+  cursor: pointer;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  font-weight: 550;
+}
+
+.omo-sys-tech[open] summary {
+  margin-bottom: var(--omo-space-2);
+}
+
+.omo-sys-tech-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+}
+
+.omo-sys-group-tech {
+  opacity: 0.96;
+}
+
+.omo-system .msg-pre,
+.omo-system pre {
+  margin: 0;
+  padding: var(--omo-space-3);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-canvas);
+  color: var(--omo-text);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  overflow: auto;
+  max-height: 280px;
+}
+
+.omo-sys-note {
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-sys-list {
+  margin: 0;
+  padding: 10px 16px 12px 32px;
+  color: var(--omo-text);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-sys-list.mono {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-sys-pad {
+  padding: 12px 16px;
+}
+
+/* ── Lifecycle (API Proxy header + readiness) ───────────────────────── */
+
+.omo-sys-readiness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  padding: 4px 16px 14px;
+}
+
+.omo-sys-readiness-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.omo-sys-readiness-label {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-sys-attach {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  padding: 4px 16px 14px;
+}
+
+.omo-sys-attach-row {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+.omo-sys-attach-cmd {
+  display: inline-block;
+  flex: 1 1 auto;
+  min-width: 220px;
+  padding: 8px 10px;
+  background: var(--omo-canvas);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  overflow-wrap: anywhere;
+}
+
+/* ── Interview / multiplexer leftovers (token restyle) ──────────────── */
+
+.omo-system .interview-authority {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.omo-system .interview-kv {
+  grid-template-columns: 112px minmax(0, 1fr);
+}
+
+.omo-system .interview-output-path,
+.omo-system .mux-break {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.omo-system .interview-port-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.omo-system .mux-topo {
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  line-height: 1.7;
+  padding: 10px 16px 14px;
+}
+
+.omo-system .mux-topo-row {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.omo-system .mux-topo-worker {
+  padding-left: 14px;
+  border-left: 1px solid var(--omo-border);
+  margin-left: 4px;
+}
+
+.omo-system .mux-topo-branch {
+  color: var(--omo-text-faint);
+}
+
+.omo-system .section-title {
+  margin: 0;
+  padding: 12px 16px 4px;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-system .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.omo-sys-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  padding: 4px 0 8px;
+}
+
+.omo-sys-preview .table-wrap,
+.omo-sys-preview table.data {
+  background: transparent;
+}
+
+.omo-sys-caps {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+/* ── Responsive 1440 / 1000 / 768 ───────────────────────────────────── */
+
+@media (max-width: 1439px) {
+  .omo-sys-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 999px) {
+  .omo-sys-toolbar,
+  .omo-sys-service,
+  .omo-sys-intro,
+  .omo-sys-group {
+    padding-left: var(--omo-space-4);
+    padding-right: var(--omo-space-4);
+  }
+
+  .omo-sys-tech {
+    margin-left: var(--omo-space-4);
+    margin-right: var(--omo-space-4);
+  }
+
+  .omo-sys-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .omo-sys-row-control,
+  .omo-sys-value {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .omo-system .row-kv,
+  .omo-system .interview-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .omo-sys-nav,
+  .omo-sys-nav-track {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .omo-sys-toolbar {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .omo-sys-index {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .omo-sys-index-track {
+    flex: 1 1 auto;
+  }
+
+  .omo-sys-service,
+  .omo-sys-intro {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .omo-sys-metric-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .omo-sys-input-wide,
+  .omo-system input[type="text"],
+  .omo-system textarea {
+    width: 100%;
+  }
+
+  .omo-sys-attach-cmd {
+    min-width: 0;
+  }
+}

@@ -1,0 +1,669 @@
+/*
+  Models workspace — Account List / dashboard treatment on the Antigravity shell.
+
+  Imported from pages/ModelsPage.tsx (unlayered). Legacy styles live in the
+  `legacy` cascade layer, so every rule here wins without specificity games.
+
+  Visual contract:
+   - condensed provider strip with progressive disclosure
+   - one rounded dense model table
+   - compact search + segmented filters
+   - readable display name, then technical id
+   - quiet inventory defaults; badges only for referenced/active,
+     failing/problem, probing, or disconnected states
+   - blue Probe Referenced as the single primary action
+   - semantic tokens only — both themes, no owned inline styles
+*/
+
+.omo-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-5);
+  min-width: 0;
+}
+
+.omo-models-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.omo-models .error {
+  border: 1px solid var(--omo-bad-border);
+  background: var(--omo-bad-bg);
+  color: var(--omo-bad);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models .warn-block {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  color: var(--omo-warn);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  border-radius: var(--omo-radius-md);
+  font-size: var(--omo-text-sm);
+  margin: 0;
+}
+
+.omo-models-notice {
+  margin: 0;
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Queue ─────────────────────────────────────────────────────────── */
+
+.omo-models-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-models-queue-title {
+  margin: 0;
+  font-size: var(--omo-text-sm);
+  font-weight: 600;
+  color: var(--omo-text-muted);
+}
+
+.omo-models-queue-item {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  min-width: 0;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-queue-model {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-models-queue-item .dot.pulse {
+  background: var(--omo-action);
+}
+
+/* ── Provider strip (condensed summary surface) ────────────────────── */
+/* One compact row per provider; full diagnostics and the provider-scoped
+   probe action live behind each row's progressive disclosure. */
+
+.omo-models-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+  min-width: 0;
+}
+
+.omo-models-strip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  min-width: 0;
+}
+
+.omo-models-strip-title {
+  margin: 0;
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-models-strip-headmeta {
+  font-size: var(--omo-text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.omo-models-strip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.omo-models-strip-row {
+  border-top: 1px solid var(--omo-border);
+}
+
+.omo-models-strip-row:first-child {
+  border-top: 0;
+}
+
+.omo-models-strip-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--omo-space-2);
+  width: 100%;
+  margin: 0;
+  padding: 7px 2px;
+  border: 0;
+  background: none;
+  color: var(--omo-text);
+  font: inherit;
+  font-size: var(--omo-text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.omo-models-strip-toggle:hover {
+  background: var(--omo-surface-hover);
+}
+
+.omo-models-strip-name {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.omo-models-strip-id {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-models-strip-summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--omo-space-3);
+  min-width: 0;
+  flex: 1 1 240px;
+  font-variant-numeric: tabular-nums;
+}
+
+.omo-models-strip-flag {
+  color: var(--omo-warn);
+  font-weight: 550;
+}
+
+.omo-models-strip-chev {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--omo-text-faint);
+  transition: transform var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-models-strip-chev[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+.omo-models-strip-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 2px var(--omo-space-3) var(--omo-space-4);
+  border-left: 2px solid var(--omo-border-strong);
+  margin: 0 0 var(--omo-space-2) 2px;
+}
+
+.omo-models-strip-metrics {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.omo-models-strip-meta {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+}
+
+.omo-models-strip-actions {
+  display: flex;
+  margin-top: var(--omo-space-2);
+}
+
+.omo-models-rate {
+  color: var(--omo-warn);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+}
+
+/* ── Filters ───────────────────────────────────────────────────────── */
+
+.omo-models-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+.omo-models-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.omo-models-search {
+  min-width: min(220px, 100%);
+  flex: 1 1 220px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-models-search::placeholder {
+  color: var(--omo-text-faint);
+}
+
+.omo-models-select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+}
+
+.omo-models-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.omo-models-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--omo-radius-pill);
+  border: 1px solid var(--omo-border);
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+  font-weight: 550;
+  cursor: pointer;
+  user-select: none;
+}
+
+.omo-models-chip:hover {
+  color: var(--omo-text);
+  background: var(--omo-surface-hover);
+}
+
+.omo-models-chip:has(input:checked) {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.omo-models-chip input {
+  margin: 0;
+}
+
+.omo-models-filter-kicker {
+  color: var(--omo-text-faint);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+}
+
+/* ── Table ─────────────────────────────────────────────────────────── */
+
+.omo-models-table-wrap {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  overflow: auto;
+  background: var(--omo-surface);
+  box-shadow: var(--omo-shadow);
+}
+
+.omo-models-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-table th,
+.omo-models-table td {
+  text-align: left;
+  padding: 9px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--omo-border);
+}
+
+.omo-models-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--omo-surface-muted);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--omo-border-strong);
+  white-space: nowrap;
+}
+
+.omo-models-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.omo-models-table tbody tr {
+  transition: background var(--omo-motion-fast) var(--omo-ease);
+}
+
+.omo-models-table tbody tr:hover td {
+  background: var(--omo-surface-hover);
+}
+
+.omo-models-table .row-clickable {
+  cursor: pointer;
+}
+
+.omo-models-table .row-clickable:focus-visible td {
+  background: var(--omo-action-soft);
+}
+
+.omo-models-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.omo-models-name-btn {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--omo-text);
+  font: inherit;
+  font-size: var(--omo-text-md);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.omo-models-name-btn:hover {
+  color: var(--omo-action);
+}
+
+.omo-models-id {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.omo-models-provider {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.omo-models-empty {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-manual {
+  margin-left: 0;
+}
+
+/* Quiet inventory default: nominal cells read as a muted em dash. */
+.omo-models-dash {
+  color: var(--omo-text-faint);
+}
+
+.omo-models .probe-unprobed {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+}
+
+.omo-models-usage {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.omo-models-usage .pill-inactive {
+  opacity: 0.55;
+}
+
+.omo-models-row-problem td {
+  box-shadow: inset 2px 0 0 var(--omo-bad);
+}
+
+/* Quiet healthy / unprobed — keep text, drop alarm. */
+.omo-models .probe-badge {
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+  color: var(--omo-text-muted);
+}
+
+.omo-models .probe-badge.ok {
+  color: var(--omo-ok);
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+.omo-models .probe-badge.bad {
+  color: var(--omo-bad);
+  background: var(--omo-bad-bg);
+  border-color: var(--omo-bad-border);
+}
+
+.omo-models .probe-badge.warn {
+  color: var(--omo-warn);
+  background: var(--omo-warn-bg);
+  border-color: var(--omo-warn-border);
+}
+
+.omo-models .probe-badge.muted {
+  color: var(--omo-text-muted);
+  background: var(--omo-surface-muted);
+  border-color: var(--omo-border);
+}
+
+.omo-models .probe-badge.run {
+  color: var(--omo-action);
+  background: var(--omo-action-soft);
+  border-color: transparent;
+}
+
+.omo-models .probe-freshness {
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+  font-size: 10px;
+}
+
+/* ── Drawer ────────────────────────────────────────────────────────── */
+
+.omo-models-drawer.drawer {
+  width: min(440px, 94vw);
+  height: 100vh;
+  overflow: auto;
+  background: var(--omo-surface);
+  border-left: 1px solid var(--omo-border);
+  padding: var(--omo-space-4) var(--omo-space-5) var(--omo-space-8);
+  box-shadow: var(--omo-shadow-pop);
+}
+
+.omo-models-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--omo-space-3);
+  margin-bottom: var(--omo-space-4);
+}
+
+.omo-models-drawer-title {
+  margin: 0;
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.omo-models-drawer-id {
+  margin-top: 2px;
+  color: var(--omo-text-faint);
+  font-family: var(--omo-font-mono);
+  font-size: var(--omo-text-xs);
+  overflow-wrap: anywhere;
+}
+
+.omo-models-drawer-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: var(--omo-space-4);
+}
+
+.omo-models-section {
+  margin: 0 0 var(--omo-space-4);
+}
+
+.omo-models-section-title {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-xs);
+  font-weight: 600;
+  letter-spacing: var(--omo-tracking-label);
+  text-transform: uppercase;
+  color: var(--omo-text-faint);
+}
+
+.omo-models-kv {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: var(--omo-space-2) 0 0;
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-kv dt {
+  color: var(--omo-text-faint);
+}
+
+.omo-models-kv dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.omo-models-drawer .omo-models-table-wrap {
+  box-shadow: none;
+}
+
+.omo-models-drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.omo-models-disabled-reason {
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+/* ── Batch confirmation ────────────────────────────────────────────── */
+
+.omo-models-batch.modal {
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  box-shadow: var(--omo-shadow-pop);
+  padding: var(--omo-space-5);
+  width: min(480px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.omo-models-batch-title {
+  margin: 0 0 var(--omo-space-2);
+  font-size: var(--omo-text-lg);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.omo-models-batch-lead {
+  margin: 0 0 var(--omo-space-3);
+  color: var(--omo-text-muted);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-batch p {
+  margin: 0 0 var(--omo-space-3);
+  font-size: var(--omo-text-sm);
+}
+
+.omo-models-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 var(--omo-space-2);
+  color: var(--omo-text);
+  font-size: var(--omo-text-sm);
+  cursor: pointer;
+}
+
+.omo-models-check input {
+  margin-top: 2px;
+}
+
+.omo-models-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--omo-space-2);
+  margin-top: var(--omo-space-4);
+}
+
+@media (max-width: 799px) {
+  .omo-models-kv {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px 0;
+  }
+
+  .omo-models-search,
+  .omo-models-select {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .omo-models-strip-summary {
+    flex-basis: 100%;
+    padding-left: calc(7px + 6px);
+  }
+
+  .omo-models-strip-head {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omo-models .dot.pulse {
+    animation: none;
+    opacity: 1;
+  }
+}
