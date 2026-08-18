@@ -53,11 +53,15 @@ export function generateNonce(): string {
  * `rawConfig` is consumed here and NEVER returned, cached, or logged.
  * Only the plugin array is read. Any unsupported entry invalidates the
  * whole view (returns invalid: true).
+ *
+ * `owlInstallRoot` is the Owl install root: canonical bridge identity is
+ * `<owlInstallRoot>/packages/omo-telemetry-bridge`. The target project
+ * directory is irrelevant to bridge fingerprint extraction.
  */
 export function extractEffectivePluginView(
   rawConfig: unknown,
   authorizedRoots: string[],
-  projectRoot: string,
+  owlInstallRoot: string,
 ): EffectivePluginView & { errors?: BridgeError[] } {
   const errors: BridgeError[] = [];
 
@@ -82,7 +86,7 @@ export function extractEffectivePluginView(
   let invalid = false;
 
   for (const raw of plugin) {
-    const extracted = extractOneEntry(raw, authorizedRoots, projectRoot);
+    const extracted = extractOneEntry(raw, authorizedRoots, owlInstallRoot);
     if (extracted.error) {
       errors.push(extracted.error);
       invalid = true;
@@ -97,7 +101,7 @@ export function extractEffectivePluginView(
 function extractOneEntry(
   raw: unknown,
   authorizedRoots: string[],
-  projectRoot: string,
+  owlInstallRoot: string,
 ):
   | { entry: EffectivePluginEntry; error?: undefined }
   | { entry?: undefined; error: BridgeError } {
@@ -112,7 +116,7 @@ function extractOneEntry(
         },
       };
     }
-    const bridge = tryBridgeFingerprint(raw, undefined, authorizedRoots, projectRoot, "string");
+    const bridge = tryBridgeFingerprint(raw, undefined, authorizedRoots, owlInstallRoot, "string");
     return {
       entry: {
         form: "string",
@@ -136,7 +140,7 @@ function extractOneEntry(
         },
       };
     }
-    const bridge = tryBridgeFingerprint(identity, options, authorizedRoots, projectRoot, "tuple");
+    const bridge = tryBridgeFingerprint(identity, options, authorizedRoots, owlInstallRoot, "tuple");
     return {
       entry: {
         form: "tuple",
@@ -177,15 +181,16 @@ function tryBridgeFingerprint(
   identity: string,
   options: Record<string, unknown> | undefined,
   authorizedRoots: string[],
-  projectRoot: string,
+  owlInstallRoot: string,
   form: "string" | "tuple",
 ): BridgeFingerprint | null {
   // Only path-like identities can be canonical bridge.
   const norm = normalizePathIdentity(identity, authorizedRoots);
   if (norm.path === null) return null;
 
-  // Check canonical bridge equivalence via realpath.
-  const canonicalCheck = resolveCanonicalBridge(identity, projectRoot, authorizedRoots);
+  // Check canonical bridge equivalence via realpath against the Owl
+  // install root (NOT the target project directory).
+  const canonicalCheck = resolveCanonicalBridge(identity, owlInstallRoot, authorizedRoots);
   if (!canonicalCheck.isCanonical) return null;
 
   if (form === "string") {

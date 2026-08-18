@@ -14,6 +14,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import {
@@ -32,7 +33,8 @@ import {
   interviewFieldsMatchAudited,
 } from "./introspect";
 
-const REAL_CONFIG_DIR = "/Users/matt/.config/opencode";
+const REAL_CONFIG_DIR =
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
 const REAL_PKG = join(
   REAL_CONFIG_DIR,
   "node_modules",
@@ -101,6 +103,7 @@ describe("installed authority — authorized roots only", () => {
       port: 0,
       opencodeConfigDir: RUNTIME_ROOT,
       projectDirectory: join(RUNTIME_ROOT, "project"),
+      owlInstallDirectory: join(RUNTIME_ROOT, "project"),
       authorizedRoots: [RUNTIME_ROOT, join(RUNTIME_ROOT, "project")],
     });
     expect(status.available).toBe(false);

@@ -135,10 +135,14 @@ const cfg = loadServerConfig();
 // The SDK inherits process.env. Materialize only the active config-dir
 // selector; do not reconstruct provider/auth environment variables.
 process.env.OPENCODE_CONFIG_DIR = cfg.opencodeConfigDir;
-if (cfg.opencodeMode === "managed" && process.cwd() !== cfg.projectDirectory) {
-  throw new Error(
-    `Managed OpenCode requires server cwd ${cfg.projectDirectory}; current cwd is ${process.cwd()}. The installed SDK has no cwd option.`,
-  );
+// Managed mode: the installed SDK has no cwd option and inherits
+// process.cwd(), so adopt the target project as this process's cwd
+// BEFORE any stores, services, lifecycle, or SDK construction. There is
+// deliberately no fixed-project cwd requirement anymore — the project
+// root comes from config (OMO_CP_PROJECT_DIR or the startup cwd). Attach
+// mode attaches to an external process and must not chdir.
+if (cfg.opencodeMode === "managed") {
+  process.chdir(cfg.projectDirectory);
 }
 
 // ── Slice 17: Bridge composition (startup order/ownership) ────────────
@@ -169,12 +173,15 @@ if (bridgeRevisionDbOk && bridgeRevisions) {
   bridgeService = new BridgeService({
     opencodeConfigDir: cfg.opencodeConfigDir,
     projectDirectory: cfg.projectDirectory,
+    owlInstallDirectory: cfg.owlInstallDirectory,
     authorizedRoots: cfg.authorizedRoots,
     revisions: bridgeRevisions,
     effectiveViewProvider: async () => {
       // Uses the CURRENT canonical OpenCodeClient only — no second runtime.
+      // Bridge identity in the effective view derives from the Owl install
+      // root, which may differ from the target project directory.
       const client = runtime.getClient();
-      return client.effectivePluginView();
+      return client.effectivePluginView({ owlInstallDirectory: cfg.owlInstallDirectory });
     },
   });
 }
@@ -774,7 +781,9 @@ async function refreshEffectiveState(): Promise<void> {
   const generation = lifecycleState.generation;
   const baseUrl = lifecycleState.baseUrl;
   try {
-    const view = await runtime.getClient().effectivePluginView();
+    const view = await runtime
+      .getClient()
+      .effectivePluginView({ owlInstallDirectory: cfg.owlInstallDirectory });
     // Discard result if generation/baseUrl changed during async fetch.
     const currentLifecycle = lifecycle.getStateWithRestartKind();
     if (currentLifecycle.generation !== generation || currentLifecycle.baseUrl !== baseUrl) {
@@ -785,6 +794,7 @@ async function refreshEffectiveState(): Promise<void> {
       {
         opencodeConfigDir: cfg.opencodeConfigDir,
         projectDirectory: cfg.projectDirectory,
+        owlInstallDirectory: cfg.owlInstallDirectory,
         authorizedRoots: cfg.authorizedRoots,
       },
       view,
@@ -835,7 +845,8 @@ function feedBridgeManagerInput(): OmoBridgeManagerInput {
 
   let localPackageAvailable: boolean | "unknown" = "unknown";
   try {
-    const bridgeDir = canonicalBridgeDir(cfg.projectDirectory);
+    // Bridge package identity derives from the Owl install root.
+    const bridgeDir = canonicalBridgeDir(cfg.owlInstallDirectory);
     localPackageAvailable = existsSync(bridgeDir);
   } catch {
     localPackageAvailable = "unknown";
@@ -860,7 +871,7 @@ function feedBridgeManagerInput(): OmoBridgeManagerInput {
   if (cachedEffectiveState) {
     registration = computeRegistrationState(
       cachedEffectiveState.view,
-      cfg.projectDirectory,
+      cfg.owlInstallDirectory,
       cfg.authorizedRoots,
     );
   }

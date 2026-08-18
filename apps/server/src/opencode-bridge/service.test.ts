@@ -47,6 +47,9 @@ beforeEach(() => {
   service = new BridgeService({
     opencodeConfigDir: configDir,
     projectDirectory: projectDir,
+    // Fixture layout keeps the bridge package under the project dir, so
+    // this fixture's "install root" IS the project dir.
+    owlInstallDirectory: projectDir,
     authorizedRoots: [configDir, projectDir],
     revisions,
     probe: fakeProbe,
@@ -256,6 +259,77 @@ describe("BridgeService.apply", () => {
 
     expect(r.ok).toBe(false);
     expect(r.errors.some((e) => e.code === "hash-conflict" || e.code === "preview-stale")).toBe(true);
+  });
+});
+
+describe("BridgeService: Owl install-root identity", () => {
+  test("canonical bridge identity derives from the install root, not the target project", async () => {
+    // Remove the fixture bridge package from the target project; the
+    // install root below is then the ONLY location carrying it.
+    try { rmSync(join(projectDir, "packages"), { recursive: true, force: true }); } catch { /* */ }
+    const installDir = join(sandbox, "owl-install");
+    const installBridgeDir = join(installDir, "packages", "omo-telemetry-bridge");
+    mkdirSync(installBridgeDir, { recursive: true });
+    writeFileSync(join(installBridgeDir, "package.json"), "{}");
+    expect(existsSync(join(projectDir, "packages", "omo-telemetry-bridge"))).toBe(false);
+
+    const installRevisions = new BridgeRevisionStore(join(sandbox, "install-bridge.db"));
+    let view: EffectivePluginView = { entries: [], invalid: false };
+    const installService = new BridgeService({
+      opencodeConfigDir: configDir,
+      projectDirectory: projectDir,
+      owlInstallDirectory: installDir,
+      authorizedRoots: [configDir, projectDir, installDir],
+      revisions: installRevisions,
+      probe: fakeProbe,
+      effectiveViewProvider: async () => view,
+    });
+
+    try {
+      writeConfig(`{"plugin":["oh-my-opencode-slim"]}`);
+      view = {
+        entries: [makeEntry("oh-my-opencode-slim", "npm")],
+        invalid: false,
+      };
+
+      const r = await installService.preview({ operation: "add" });
+
+      expect(r.ok).toBe(true);
+      // The registered identity is the install-root bridge path...
+      const expectedIdentity = canonicalBridgeDir(installDir);
+      expect(expectedIdentity).toBe(realpathSync(installBridgeDir));
+      expect(r.diff).toContain(expectedIdentity);
+      // ...and is NOT a path under the target project.
+      expect(r.diff).not.toContain(join(projectDir, "packages"));
+      expect(existsSync(join(projectDir, "packages", "omo-telemetry-bridge"))).toBe(false);
+
+      // End-to-end resolver equivalence with install root ≠ project root:
+      // apply the add, then prove the source candidate (install-root bridge
+      // path) still matches the effective view through the canonical
+      // identity path by successfully previewing a remove.
+      const applied = await installService.apply({ previewId: r.previewId });
+      expect(applied.ok).toBe(true);
+      const path = join(configDir, "opencode.json");
+      const finalText = readFileSync(path, "utf-8");
+      expect(finalText).toContain(expectedIdentity);
+
+      // Effective view mirrors the on-disk plugin sequence with the
+      // cross-form file:// identity (as the real runtime reports). The
+      // path ↔ file-url match can ONLY succeed through canonical
+      // resolution against the Owl install root — proving the resolver
+      // identity path, not lexical equality.
+      view = {
+        entries: [
+          makeEntry("oh-my-opencode-slim", "npm"),
+          makeEntry(`file://${expectedIdentity}`, "file-url"),
+        ],
+        invalid: false,
+      };
+      const removePreview = await installService.preview({ operation: "remove" });
+      expect(removePreview.ok).toBe(true);
+    } finally {
+      try { installRevisions.close(); } catch { /* */ }
+    }
   });
 });
 

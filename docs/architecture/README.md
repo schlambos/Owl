@@ -5,15 +5,22 @@ See `PLAN.md` (product gospel) and `docs/recon/*` for verified environment facts
 ## Running
 
 ```bash
-cd ~/Repos/omo-slim
+# clone anywhere — the checkout directory is the Owl install root
+git clone <repo-url> omo-slim
+cd omo-slim
 bun install
-bun run dev          # server + frontend, single supervisor (default)
+bun run dev          # server http://127.0.0.1:8787 + web http://127.0.0.1:5173, backend 4096 auto-managed
+# default target project is this checkout (launchers start the server with cwd = install root)
+# explicit distinct target:
+OMO_CP_PROJECT_DIR=/path/to/your/project bun run dev
 # or separately:
 bun run dev:server   # http://127.0.0.1:8787 (with --watch)
 bun run dev:web      # http://127.0.0.1:5173
 ```
 
 No separate `opencode serve` is required. In Managed mode (default, `OPENCODE_BASE_URL` unset) the control plane owns the OpenCode backend lifecycle via the installed SDK. In Attach mode (`OPENCODE_BASE_URL=http://host:port`) it attaches to an external server and never owns/stops it. See `30-managed-opencode-runtime.md` for the full lifecycle.
+
+Owl install root is discovered portably from the root `package.json` (`omo-control-plane`) and is distinct from the selected target project. `OMO_CP_PROJECT_DIR` (absolute existing directory; default is the server's startup cwd, which under `bun run dev`/`dev:server`/`start` is the Owl checkout because launchers start the server there) selects the target project. `OPENCODE_CONFIG_DIR` (absolute existing directory; default `$HOME/.config/opencode`) selects the active OpenCode config. Authorized filesystem roots are exactly the realpaths of Owl install root, target project root, and OpenCode config root. In Managed mode the server changes cwd to the selected target immediately after config load so the SDK inherits it; Attach mode does not chdir and never owns/stops an external backend. API/UI/preferred backend ports remain `8787`/`5173`/`4096`. `bun run dev` remains the one-command workflow; separate `dev:server`/`dev:web`/`start` commands are unchanged. Telemetry bridge package identity (`packages/omo-telemetry-bridge`) resolves under the Owl install root, not the target project.
 
 Environment:
 
@@ -22,7 +29,8 @@ Environment:
 | `OPENCODE_BASE_URL` | unset | Unset → Managed (control plane owns backend). Set → Attach (external backend, never owned/stopped). |
 | `OPENCODE_SERVER_PASSWORD` | unset | OpenCode Basic auth password; unset = unsecured server. |
 | `OPENCODE_SERVER_USERNAME` | `opencode` | OpenCode Basic auth username. |
-| `OPENCODE_CONFIG_DIR` | `~/.config/opencode` | Active OpenCode config directory. |
+| `OPENCODE_CONFIG_DIR` | `$HOME/.config/opencode` | Absolute existing directory; default `$HOME/.config/opencode`. |
+| `OMO_CP_PROJECT_DIR` | server cwd (Owl checkout under `bun run dev`/`dev:server`/`start`) | Absolute existing directory; selects target project. Default is the server's startup cwd, which under the official launchers is the Owl install root checkout. |
 | `OH_MY_OPENCODE_SLIM_DISABLE` | unset | OMO kill switch; any non-empty/false value relaxes OMO registration requirement. |
 | `OMO_CP_HOST` | `127.0.0.1` | Control plane bind host. |
 | `OMO_CP_PORT` | `8787` | Control plane bind port. |

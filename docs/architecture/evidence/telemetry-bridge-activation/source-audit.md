@@ -1,7 +1,7 @@
 # Slice 17 — Telemetry Bridge Activation Source Audit
 
 **Deliverable owner:** parent source-audit owner will review.  
-**Scope:** OMO-Slim repository (`/Users/matt/Repos/omo-slim`) and installed OpenCode config directory (`/Users/matt/.config/opencode`) only.  
+**Scope:** OMO-Slim repository (`<owl-install-root>`) and installed OpenCode config directory (`<opencode-config-dir>`) only.
 **Boundary:** this audit was performed before the Slice 17 implementation; it documents the pre-implementation state. The post-implementation behavior is recorded in [`manifest.md`](./manifest.md). No live probes were run and no configuration was changed during the audit.
 
 Legend for evidence class:
@@ -18,7 +18,7 @@ Legend for evidence class:
 
 | Boundary | Status | Evidence |
 |---|---|---|
-| Filesystem scope | enforced | `/Users/matt/Repos/omo-slim`, `/Users/matt/.config/opencode` |
+| Filesystem scope | enforced | `<owl-install-root>`, `<opencode-config-dir>` |
 | No code/config changes | enforced | no writes outside this deliverable; parent dirs created only as requested |
 | No live probes | enforced | no network/HTTP calls executed |
 | Secret-bearing config | sanitized | `opencode.json` provider API keys are not reproduced in this document |
@@ -38,7 +38,7 @@ The implementation described in this audit is now complete. See [`manifest.md`](
 
 | Field | Value | Path |
 |---|---|---|
-| Package name | `@omo/telemetry-bridge` | `/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge/package.json:2` |
+| Package name | `@omo/telemetry-bridge` | `<owl-install-root>/packages/omo-telemetry-bridge/package.json:2` |
 | Version | `0.1.0` | `package.json:3` |
 | Private | `true` | `package.json:4` |
 | Type | ESM (`"type": "module"`) | `package.json:5` |
@@ -193,21 +193,21 @@ The implementation described in this audit is now complete. See [`manifest.md`](
 
 | Fact | Value | Path |
 |---|---|---|
-| Both JSON and JSONC exist | `opencode.json` and `opencode.jsonc` present | `/Users/matt/.config/opencode/` |
-| `opencode.json` schema | `$schema: "https://opencode.ai/config.json"` | `/Users/matt/.config/opencode/opencode.json:2` |
-| `opencode.json` plugin array | `["@ex-machina/opencode-anthropic-auth@1.8.1", "oh-my-opencode-slim"]` | `/Users/matt/.config/opencode/opencode.json:3-6` |
-| `opencode.jsonc` content | only `$schema` line (no plugins declared) | `/Users/matt/.config/opencode/opencode.jsonc:1-3` |
+| Both JSON and JSONC exist | `opencode.json` and `opencode.jsonc` present | `<opencode-config-dir>/` |
+| `opencode.json` schema | `$schema: "https://opencode.ai/config.json"` | `<opencode-config-dir>/opencode.json:2` |
+| `opencode.json` plugin array | `["@ex-machina/opencode-anthropic-auth@1.8.1", "oh-my-opencode-slim"]` | `<opencode-config-dir>/opencode.json:3-6` |
+| `opencode.jsonc` content | only `$schema` line (no plugins declared) | `<opencode-config-dir>/opencode.jsonc:1-3` |
 | Active source | **not proven** without sanitized live `GET /config`; file content shows plugin identities only | limitation |
 
 ### 5.2 Installed package versions
 
 | Package | Installed version | Path |
 |---|---|---|
-| `oh-my-opencode-slim` | `2.2.10` | `/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/package.json:3` |
-| `@opencode-ai/plugin` (top-level) | `1.18.14` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/package.json:4` |
-| `@opencode-ai/sdk` (top-level) | `1.18.14` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/package.json:4` |
-| `@opencode-ai/plugin` (nested under `oh-my-opencode-slim`) | `1.18.13` | `/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/package.json:84` |
-| `@opencode-ai/sdk` (nested under `oh-my-opencode-slim`) | `1.18.13` | `/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/package.json:85` |
+| `oh-my-opencode-slim` | `2.2.10` | `<opencode-config-dir>/node_modules/oh-my-opencode-slim/package.json:3` |
+| `@opencode-ai/plugin` (top-level) | `1.18.14` | `<opencode-config-dir>/node_modules/@opencode-ai/plugin/package.json:4` |
+| `@opencode-ai/sdk` (top-level) | `1.18.14` | `<opencode-config-dir>/node_modules/@opencode-ai/sdk/package.json:4` |
+| `@opencode-ai/plugin` (nested under `oh-my-opencode-slim`) | `1.18.13` | `<opencode-config-dir>/node_modules/oh-my-opencode-slim/package.json:84` |
+| `@opencode-ai/sdk` (nested under `oh-my-opencode-slim`) | `1.18.13` | `<opencode-config-dir>/node_modules/oh-my-opencode-slim/package.json:85` |
 
 **Drift:** `oh-my-opencode-slim` declares plugin/sdk dependency `1.18.13` but the top-level installed copies are `1.18.14`.
 
@@ -216,13 +216,13 @@ The implementation described in this audit is now complete. See [`manifest.md`](
 | Fact | Value | Path |
 |---|---|---|
 | SDK v1 generated types plugin field | `Array<string>` only (v1 `Config` lacks tuple support) | `@opencode-ai/sdk/dist/gen/client/types.gen.d.ts` (no `plugin` tuple field) |
-| SDK v2 generated types plugin field | `plugin?: Array<string \| [string, { [key: string]: unknown }]>` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/types.gen.d.ts:1546-1551` |
-| `@opencode-ai/plugin` Config plugin field | `plugin?: Array<string \| [string, PluginOptions]>` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts:48-50` |
+| SDK v2 generated types plugin field | `plugin?: Array<string \| [string, { [key: string]: unknown }]>` | `<opencode-config-dir>/node_modules/@opencode-ai/sdk/dist/v2/gen/types.gen.d.ts:1546-1551` |
+| `@opencode-ai/plugin` Config plugin field | `plugin?: Array<string \| [string, PluginOptions]>` | `<opencode-config-dir>/node_modules/@opencode-ai/plugin/dist/index.d.ts:48-50` |
 | Tuple support in type declarations | installed plugin schema allows `[string, options]` tuple | verified local |
 | Tuple runtime acceptance | **unproven** — running OpenCode process may differ from installed `1.18.14/1.18.13` declarations | limitation |
-| `PluginInput` shape | `{ client, project, directory, worktree, experimental_workspace, serverUrl, $ }` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts:36-46` |
-| SDK server spawn | uses synchronous `cross-spawn` with inherited `process.env` before first `await` | `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/dist/server.js:1-17` |
-| Config injection | `OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config ?? {})` is written into child env | `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/dist/server.js:13-17` |
+| `PluginInput` shape | `{ client, project, directory, worktree, experimental_workspace, serverUrl, $ }` | `<opencode-config-dir>/node_modules/@opencode-ai/plugin/dist/index.d.ts:36-46` |
+| SDK server spawn | uses synchronous `cross-spawn` with inherited `process.env` before first `await` | `<opencode-config-dir>/node_modules/@opencode-ai/sdk/dist/server.js:1-17` |
+| Config injection | `OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config ?? {})` is written into child env | `<opencode-config-dir>/node_modules/@opencode-ai/sdk/dist/server.js:13-17` |
 
 ### 5.4 Limitations of installed evidence
 
@@ -265,7 +265,7 @@ The implementation described in this audit is now complete. See [`manifest.md`](
 | 1 | Activation doc health example reports schema v1; code emits v2 | `ACTIVATION.md:48` vs `src/stores.ts:29` | Doc example stale; actual health output is v2. |
 | 2 | Activation doc instructs fixed port `8788` / manual `opencode.json` edit; server only consumes an already-running bridge via `OMO_BRIDGE_BASE_URL`; it does not register or load the plugin | `ACTIVATION.md:23-41` vs `apps/server/src/config.ts:19-55`, `apps/server/src/index.ts:114` | Bridge endpoint remains absent unless the OpenCode runtime loads the plugin independently; server side is a consumer, not the activator. |
 | 3 | Activation doc says schema v1; stores.ts is schema v2 | `ACTIVATION.md:1-7` vs `src/stores.ts:29` | Bridge emits v2 by default; v1 consumers are backward-compatible via accepted versions. |
-| 4 | `oh-my-opencode-slim` declares plugin/sdk `1.18.13`; top-level installed are `1.18.14` | `/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/package.json:84-85` vs `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/package.json:4` and `sdk/package.json:4` | Minor runtime version mismatch; could affect tuple/config behavior if runtime picks nested copy. |
+| 4 | `oh-my-opencode-slim` declares plugin/sdk `1.18.13`; top-level installed are `1.18.14` | `<opencode-config-dir>/node_modules/oh-my-opencode-slim/package.json:84-85` vs `<opencode-config-dir>/node_modules/@opencode-ai/plugin/package.json:4` and `sdk/package.json:4` | Minor runtime version mismatch; could affect tuple/config behavior if runtime picks nested copy. |
 | 5 | Web local `OmoBridgeStores` omits v2 record fields | `apps/web/src/pages/omo-runtime-types.ts:32-46` vs `apps/server/src/omo-runtime/types.ts:106-134` | Web type declarations are incomplete; runtime payloads carry the fields anyway. |
 | 6 | `OverviewPage` hardcodes `:8788` display | `apps/web/src/pages/OverviewPage.tsx:54` vs configurable `OMO_BRIDGE_PORT`/`OMO_BRIDGE_BASE_URL` | UI may misreport port if non-default bridge port is used. |
 | 7 | Advisory v1.18.18 docs vs installed 1.18.14/1.18.13 | See section 6 | Do not assume latest behavior; verify with controlled runtime. |
@@ -277,7 +277,7 @@ The implementation described in this audit is now complete. See [`manifest.md`](
 
 These gates require controlled canonical-runtime evidence and are **not** closed by this audit:
 
-1. **Active source provenance** — is the running OpenCode process actually using `/Users/matt/.config/opencode/opencode.json` (not `opencode.jsonc`, not API-injected config, not `OPENCODE_CONFIG_CONTENT`)? Requires sanitized `GET /config` or equivalent.
+1. **Active source provenance** — is the running OpenCode process actually using `<opencode-config-dir>/opencode.json` (not `opencode.jsonc`, not API-injected config, not `OPENCODE_CONFIG_CONTENT`)? Requires sanitized `GET /config` or equivalent.
 2. **Tuple acceptance** — does the installed runtime load `["./packages/omo-telemetry-bridge", { ... }]` if supplied? Type declarations support it; runtime behavior unproven.
 3. **Config file precedence** — if `opencode.json` and `opencode.jsonc` both exist, which wins and under what conditions?
 4. **Plugin deduplication rule** — exact file URL vs package name+version vs package name only.
@@ -329,10 +329,10 @@ These gates require controlled canonical-runtime evidence and are **not** closed
 - `apps/web/src/pages/system/multiplexer-utils.ts` — mapping utility owner: web lane.
 - `apps/web/src/hooks/useOmoRuntime.ts` — runtime hook owner: web lane.
 - `apps/web/src/hooks/useMultiplexer.ts` — multiplexer hook owner: web lane.
-- `/Users/matt/.config/opencode/opencode.json` — config source owner: config audit lane.
-- `/Users/matt/.config/opencode/opencode.jsonc` — config source owner: config audit lane.
-- `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts` — plugin schema owner: config audit lane.
-- `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/dist/server.js` — SDK server spawn owner: runtime/platform lane.
+- `<opencode-config-dir>/opencode.json` — config source owner: config audit lane.
+- `<opencode-config-dir>/opencode.jsonc` — config source owner: config audit lane.
+- `<opencode-config-dir>/node_modules/@opencode-ai/plugin/dist/index.d.ts` — plugin schema owner: config audit lane.
+- `<opencode-config-dir>/node_modules/@opencode-ai/sdk/dist/server.js` — SDK server spawn owner: runtime/platform lane.
 
 ---
 

@@ -10,11 +10,11 @@ import { BridgeRevisionStore } from "../opencode-bridge/revisions-bridge";
 import { fingerprintNonce } from "../opencode-bridge/extractor";
 import { hashContent } from "../cfgwrite/jsonc-edit";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
-const CONFIG_DIR = process.env.OPENCODE_CONFIG_DIR || "/Users/matt/.config/opencode";
-const SDK_ROOT = `${CONFIG_DIR}/node_modules/@opencode-ai/sdk`;
+const CONFIG_DIR = process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
+const SDK_ROOT = join(CONFIG_DIR, "node_modules", "@opencode-ai", "sdk");
 
 describe("installed SDK lifecycle contract", () => {
   test("active-config SDK is 1.18.14 and preserves port:0 actual-url contract", () => {

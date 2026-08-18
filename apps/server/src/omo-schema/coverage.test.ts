@@ -10,6 +10,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { OPTION_CATALOG } from "../omo/catalog";
 import {
@@ -28,7 +29,8 @@ import {
   walkInstalledSchemaLeaves,
 } from "./coverage";
 
-const REAL_CONFIG_DIR = "/Users/matt/.config/opencode";
+const REAL_CONFIG_DIR =
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
 const REAL_PKG = join(
   REAL_CONFIG_DIR,
   "node_modules",
@@ -60,7 +62,7 @@ describe("installed coverage walk (live authority)", () => {
   realTest("current 2.2.10 schema classifies every current leaf", () => {
     const snap = loadInstalledSchema({
       opencodeConfigDir: REAL_CONFIG_DIR,
-      authorizedRoots: [REAL_CONFIG_DIR, "/Users/matt/Repos/omo-slim"],
+      authorizedRoots: [REAL_CONFIG_DIR, "/tmp/owl-fixture/project"],
     });
     expect(snap.available).toBe(true);
     if (!snap.available) return;
@@ -112,7 +114,7 @@ describe("installed coverage walk (live authority)", () => {
   realTest("catalog Interview/Companion rows stay aligned with installed coverage", () => {
     const snap = loadInstalledSchema({
       opencodeConfigDir: REAL_CONFIG_DIR,
-      authorizedRoots: [REAL_CONFIG_DIR, "/Users/matt/Repos/omo-slim"],
+      authorizedRoots: [REAL_CONFIG_DIR, "/tmp/owl-fixture/project"],
     });
     expect(snap.available).toBe(true);
     if (!snap.available) return;

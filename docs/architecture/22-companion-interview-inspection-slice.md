@@ -69,7 +69,7 @@ Zod non-strict with real `.default()`s:
 
 ## Interview — filesystem boundary
 
-Output resolves under `ctx.directory` = `/Users/matt/Repos/omo-slim` → `withinAuthorizedScope:true`, but folder contents are **never listed/stat-ed** (`inspected:false, exists:null` always). A constructed test with roots excluding ctx.directory proves `withinAuthorizedScope:false` + zero inspection.
+Output resolves under `ctx.directory` = `<owl-install-root>` → `withinAuthorizedScope:true`, but folder contents are **never listed/stat-ed** (`inspected:false, exists:null` always). A constructed test with roots excluding ctx.directory proves `withinAuthorizedScope:false` + zero inspection.
 
 ## Control-plane modules (server-side, local types — council/acp precedent)
 
@@ -132,7 +132,7 @@ No Edit/Start/Stop/Restart/Test/Open buttons anywhere.
 | Effective | enabled false; position bottom-right; size medium; gifPack default; loopStyle classic; speed 1; debug false | maxQuestions 2; outputFolder "interview"; autoOpenBrowser true; port 0; dashboard false |
 | Provenance | enabled: user-config; rest builtin defaults | all builtin defaults |
 | Binary | default path `~/.local/share/opencode/storage/oh-my-opencode-slim/bin/oh-my-opencode-slim-companion`; **outside scope — not inspected** | — |
-| Output | — | resolved `/Users/matt/Repos/omo-slim/interview`; in scope; **not inspected** |
+| Output | — | resolved `<owl-install-root>/interview`; in scope; **not inspected** |
 | Runtime | not observable (cited) | not observable (cited) |
 | Doctor | `companion.disabled` healthy | `interview.valid` healthy |
 

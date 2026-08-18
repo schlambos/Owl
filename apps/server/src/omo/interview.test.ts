@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { resolveProvenance } from "./provenance";
 import {
@@ -359,7 +360,7 @@ describe("interview output filesystem boundary", () => {
     const { bundle, userDir } = setup({
       interview: { outputFolder: "injected-out" },
     });
-    const injected = "/Users/matt/Repos/omo-slim/__d0-uninspected-interview__";
+    const injected = "/tmp/owl-fixture/outside/__d0-uninspected-interview__";
     const st = buildInterviewState(bundle, injected, [userDir, injected], {});
     expect(st.output.configuredFolder).toBe("injected-out");
     expect(st.output.normalizedFolder).toBe("injected-out");
@@ -375,7 +376,8 @@ describe("interview output filesystem boundary", () => {
   });
 });
 
-const REAL_CONFIG_DIR = "/Users/matt/.config/opencode";
+const REAL_CONFIG_DIR =
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
 const REAL_SCHEMA = join(
   REAL_CONFIG_DIR,
   "node_modules",

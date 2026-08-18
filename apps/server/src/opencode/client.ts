@@ -179,17 +179,24 @@ export class OpenCodeClient {
    *
    * Fetches GET /config through the existing authenticated SDK/client path.
    * Raw config exists ONLY inside this method — it is immediately passed to
-   * `extractEffectivePluginView(raw, authorizedRoots, projectDirectory)`
+   * `extractEffectivePluginView(raw, authorizedRoots, owlInstallRoot)`
    * from opencode-bridge and the sanitized view is returned. Never caches,
    * logs, or throws raw config or option values. If the endpoint is
    * unavailable or the payload is malformed, returns an unavailable/invalid
    * redacted state.
    *
+   * `opts.owlInstallDirectory` is the Owl install root used for canonical
+   * bridge identity (`<install>/packages/omo-telemetry-bridge`). When
+   * omitted, the client's project directory is used as the legacy
+   * co-located fallback.
+   *
    * Does NOT add a second runtime — this is a read-only view over the
    * canonical OpenCode backend's effective config.
    */
-  async effectivePluginView(): Promise<EffectivePluginView> {
-    const projectRoot = this.projectDirectory ?? "";
+  async effectivePluginView(opts?: {
+    owlInstallDirectory?: string;
+  }): Promise<EffectivePluginView> {
+    const owlInstallRoot = opts?.owlInstallDirectory ?? this.projectDirectory ?? "";
     const roots = this.authorizedRoots;
     let raw: unknown;
     try {
@@ -205,7 +212,7 @@ export class OpenCodeClient {
     // Raw config exists ONLY in this scope. Immediately extract the
     // sanitized view; never cache/log/throw the raw payload or option values.
     try {
-      const view = extractEffectivePluginView(raw, roots, projectRoot);
+      const view = extractEffectivePluginView(raw, roots, owlInstallRoot);
       // Strip errors from the returned view — they may carry redacted
       // messages but we keep the boundary strict by not propagating them.
       const { entries, unavailable, invalid } = view;

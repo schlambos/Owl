@@ -249,6 +249,7 @@ export function composeBridgeStatus(
     const { candidates } = resolveSourceCandidates({
       opencodeConfigDir: cfg.opencodeConfigDir,
       projectDirectory: cfg.projectDirectory,
+      owlInstallDirectory: cfg.owlInstallDirectory,
       authorizedRoots: cfg.authorizedRoots,
     });
     const candidate = candidates.find((c) => realpathIfExists(c.path) === realTarget);
@@ -376,7 +377,7 @@ export function composeBridgeStatus(
           } : {}),
         })),
       };
-      registration = computeRegistrationState(view, cfg.projectDirectory, cfg.authorizedRoots);
+      registration = computeRegistrationState(view, cfg.owlInstallDirectory, cfg.authorizedRoots);
     }
   }
 
@@ -395,7 +396,7 @@ export function composeBridgeStatus(
     if (cachedEffectiveState && cachedEffectiveState.resolver.status === "proven") {
       const candidate = cachedEffectiveState.resolver.candidate;
       const identities = candidate.pluginEntries.map((e) => e.identity);
-      const dupResult = detectDuplicateBridgeEntries(identities, cfg.projectDirectory, cfg.authorizedRoots);
+      const dupResult = detectDuplicateBridgeEntries(identities, cfg.owlInstallDirectory, cfg.authorizedRoots);
       duplicates.inSource = dupResult.canonicalCount > 1;
     }
   } catch {
@@ -444,9 +445,11 @@ export function composeBridgeStatus(
   }
 
   // ── Local package availability ───────────────────────────────────────
+  // Bridge package identity lives under the Owl install root, not the
+  // target project directory.
   let localPackageAvailable: TelemetryBridgeLocalPackage = "unknown";
   try {
-    const bridgeDir = canonicalBridgeDir(cfg.projectDirectory);
+    const bridgeDir = canonicalBridgeDir(cfg.owlInstallDirectory);
     localPackageAvailable = existsSync(bridgeDir);
   } catch {
     localPackageAvailable = "unknown";
@@ -647,12 +650,16 @@ function computeActionEligibility(
  * Compute the registration state from a sanitized EffectivePluginView.
  * Detects not-registered/registered/duplicate/unknown.
  * Both opencode.json/jsonc may exist; unique effective sequence match.
+ * `owlInstallRoot`/`authorizedRoots` are accepted for identity-model
+ * symmetry with the other composition helpers.
  */
 export function computeRegistrationState(
   effectiveView: EffectivePluginView | null,
-  projectRoot: string,
+  owlInstallRoot: string,
   authorizedRoots: string[],
 ): TelemetryBridgeRegistrationState {
+  void owlInstallRoot;
+  void authorizedRoots;
   if (!effectiveView || effectiveView.unavailable) return "unknown";
   if (effectiveView.invalid) return "unknown";
 

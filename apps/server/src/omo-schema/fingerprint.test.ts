@@ -16,6 +16,7 @@ function cfg(userDir: string, projDir: string) {
     port: 0,
     opencodeConfigDir: userDir,
     projectDirectory: projDir,
+    owlInstallDirectory: projDir,
     authorizedRoots: [userDir, projDir, ROOT],
   };
 }

@@ -20,8 +20,7 @@ export function AppShell(props: { children: ReactNode }) {
       <header className="omo-chrome">
         <div className="omo-topbar">
           <div className="omo-brand">
-            <span className="omo-brand-name">OMO</span>
-            <span className="omo-brand-product">Control</span>
+            <span className="omo-brand-name">Owl</span>
           </div>
           <div className="omo-primary-slot">
             {compact ? (

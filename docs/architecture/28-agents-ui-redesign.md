@@ -13,7 +13,7 @@ The earlier generic bento/marketing recommendation (from a dashboard-generation 
 
 ## Skills used
 
-The active config had **no frontend skills installed**; the user explicitly authorized reading `/Users/matt/.agents`. Skills actually invoked:
+The active config had **no frontend skills installed**; the user explicitly authorized reading `<home>/.agents`. Skills actually invoked:
 
 | Skill | What was taken |
 |---|---|

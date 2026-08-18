@@ -87,7 +87,7 @@ function muxMapped(
             value: "tmux",
             sourceId: "user-config",
             sourceLabel: "user config",
-            sourcePath: "/Users/matt/.config/omo/omo.json",
+            sourcePath: "/tmp/owl-fixture/opencode/omo.json",
             stage: "user-config",
             order: 1,
           },
@@ -154,7 +154,7 @@ const SIM_OK = {
   ok: true,
   errors: [],
   warnings: [],
-  targetPath: "/Users/matt/.config/omo/omo.json",
+  targetPath: "/tmp/owl-fixture/opencode/omo.json",
   createsFile: false,
   currentHash: "user-hash-1",
   textDiff: '+  "multiplexer": {\n+    "type": "tmux"\n+  }',
@@ -509,7 +509,7 @@ describe("48 · edit configuration flow", () => {
     const preview = screen.getByTestId("mux-preview");
     // aria-live async surface.
     expect(preview.getAttribute("aria-live")).toBe("polite");
-    expect(preview.textContent).toContain("/Users/matt/.config/omo/omo.json");
+    expect(preview.textContent).toContain("/tmp/owl-fixture/opencode/omo.json");
     expect(preview.textContent).toContain("multiplexer.type");
     expect(preview.textContent).toContain("(not set)");
     expect(preview.textContent).toContain("tmux");

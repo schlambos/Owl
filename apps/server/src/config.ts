@@ -1,5 +1,3 @@
-export const MANAGED_PROJECT_DIRECTORY = "/Users/matt/Repos/omo-slim";
-export const DEFAULT_OPENCODE_CONFIG_DIRECTORY = "/Users/matt/.config/opencode";
 export const PREFERRED_OPENCODE_BASE_URL = "http://127.0.0.1:4096";
 
 // Oracle decision 10: consolidated override validator.
@@ -9,6 +7,16 @@ import type { BridgeOverrideStatus } from "./opencode-bridge/override";
 export type { BridgeOverrideStatus };
 export { validateBridgeOverride };
 
+import { readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Package name of the control-plane monorepo root package. */
+const OWL_INSTALL_PACKAGE_NAME = "omo-control-plane";
+/** Maximum ancestor directories walked above the start directory. */
+const MAX_INSTALL_ROOT_ANCESTOR_HOPS = 10;
+
 export interface ServerConfig {
   host: string;
   port: number;
@@ -16,10 +24,12 @@ export interface ServerConfig {
   opencodeMode?: "managed" | "attach";
   /** Raw attach request. It is validated by the lifecycle manager and has no default. */
   opencodeAttachBaseUrl?: string;
-  /** Authorized OpenCode config directory */
+  /** Authorized OpenCode config directory (realpath) */
   opencodeConfigDir: string;
-  /** Authorized project root for project-local OMO config */
+  /** Authorized project root for project-local OMO config (realpath) */
   projectDirectory: string;
+  /** Discovered omo-control-plane install root (realpath) */
+  owlInstallDirectory: string;
   /** Only these roots may be read from disk */
   authorizedRoots: string[];
   /**
@@ -39,18 +49,114 @@ export interface ServerConfig {
   omoBridgeOverride?: BridgeOverrideStatus;
 }
 
+/**
+ * Locate the omo-control-plane install root portably: start at `startDir`
+ * (defaults to this module's directory), walk upward at most
+ * MAX_INSTALL_ROOT_ANCESTOR_HOPS directories, and return the realpath of
+ * the first directory whose `package.json` has name exactly
+ * "omo-control-plane". Missing, unreadable, invalid, and non-matching
+ * manifests (and non-directory candidates) are skipped. A clear startup
+ * error is thrown when no ancestor within the hop limit matches.
+ *
+ * There is deliberately no `../../..` literal and no process.cwd()
+ * authority here: the install root derives from where this module lives.
+ */
+export function resolveOwlInstallDirectory(
+  startDir: string = dirname(fileURLToPath(import.meta.url)),
+): string {
+  let candidate = startDir;
+  for (let hop = 0; hop <= MAX_INSTALL_ROOT_ANCESTOR_HOPS; hop++) {
+    try {
+      const manifest = JSON.parse(
+        readFileSync(join(candidate, "package.json"), "utf8"),
+      ) as { name?: unknown };
+      if (
+        typeof manifest === "object" &&
+        manifest !== null &&
+        manifest.name === OWL_INSTALL_PACKAGE_NAME &&
+        statSync(candidate).isDirectory()
+      ) {
+        return realpathSync(candidate);
+      }
+    } catch {
+      // Missing/unreadable/invalid manifest or vanished/non-directory
+      // candidate: skip it and keep walking.
+    }
+    const parent = dirname(candidate);
+    if (parent === candidate) break; // reached filesystem root
+    candidate = parent;
+  }
+  throw new Error(
+    `omo-control-plane install root not found: no package.json named ` +
+      `"${OWL_INSTALL_PACKAGE_NAME}" within ${MAX_INSTALL_ROOT_ANCESTOR_HOPS} ` +
+      `ancestor directories of ${startDir}`,
+  );
+}
+
+/**
+ * Validate a configured directory (already trimmed of surrounding
+ * whitespace): must be non-empty, absolute, exist, and be a directory.
+ * Returns the canonical realpath. `label` names the setting in errors.
+ */
+function resolveAuthorizedRealDirectory(raw: string, label: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    throw new Error(`${label} is present but empty`);
+  }
+  if (!isAbsolute(trimmed)) {
+    throw new Error(`${label} must be an absolute directory path: ${trimmed}`);
+  }
+  let stats;
+  try {
+    stats = statSync(trimmed);
+  } catch {
+    throw new Error(`${label} does not exist: ${trimmed}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(`${label} is not a directory: ${trimmed}`);
+  }
+  return realpathSync(trimmed);
+}
+
 export function loadServerConfig(
   env: Record<string, string | undefined> = process.env,
 ): ServerConfig {
-  // The managed backend and every project-scoped request intentionally use
-  // one fixed project. OMO_CP_PROJECT_DIR was a historical escape hatch that
-  // made backend identity ambiguous and is no longer a runtime authority.
-  const projectDirectory = MANAGED_PROJECT_DIRECTORY;
-  const opencodeConfigDir =
-    env.OPENCODE_CONFIG_DIR ?? DEFAULT_OPENCODE_CONFIG_DIRECTORY;
-  if (!opencodeConfigDir) {
-    throw new Error("OPENCODE_CONFIG_DIR is present but empty");
+  // Install root derives from this module's location only.
+  const owlInstallDirectory = resolveOwlInstallDirectory();
+
+  // OMO_CP_PROJECT_DIR is the project-root authority. When unset, the
+  // project root is the realpath of process.cwd() at load time (which must
+  // be an existing directory). loadServerConfig never chdir()s.
+  const projectDirectory =
+    env.OMO_CP_PROJECT_DIR !== undefined
+      ? resolveAuthorizedRealDirectory(env.OMO_CP_PROJECT_DIR, "OMO_CP_PROJECT_DIR")
+      : resolveAuthorizedRealDirectory(
+          process.cwd(),
+          "Project directory (process.cwd())",
+        );
+
+  // OPENCODE_CONFIG_DIR selects the active OpenCode config directory.
+  // When unset, the conventional home location is used and must exist.
+  let opencodeConfigDir: string;
+  if (env.OPENCODE_CONFIG_DIR !== undefined) {
+    opencodeConfigDir = resolveAuthorizedRealDirectory(
+      env.OPENCODE_CONFIG_DIR,
+      "OPENCODE_CONFIG_DIR",
+    );
+  } else {
+    const defaultConfigDir = join(homedir(), ".config", "opencode");
+    opencodeConfigDir = resolveAuthorizedRealDirectory(
+      defaultConfigDir,
+      `Default OpenCode config directory (${defaultConfigDir})`,
+    );
   }
+
+  // Sole constructor of the authorized-root set: exact deduped realpaths
+  // of install root, project root, and OpenCode config root.
+  const authorizedRoots = [
+    ...new Set([owlInstallDirectory, projectDirectory, opencodeConfigDir]),
+  ];
+
   const attachRequested = Object.prototype.hasOwnProperty.call(
     env,
     "OPENCODE_BASE_URL",
@@ -73,7 +179,8 @@ export function loadServerConfig(
       : {}),
     opencodeConfigDir,
     projectDirectory,
-    authorizedRoots: [projectDirectory, opencodeConfigDir],
+    owlInstallDirectory,
+    authorizedRoots,
     omoBridgeBaseUrl,
     omoBridgeOverride,
   };

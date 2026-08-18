@@ -133,7 +133,7 @@ function interviewDto(overrides: Record<string, unknown> = {}) {
     output: {
       configuredFolder: "interview",
       normalizedFolder: "interview",
-      resolvedPath: "/Users/matt/Repos/omo-slim/interview",
+      resolvedPath: "/tmp/owl-fixture/project/interview",
       withinAuthorizedScope: true,
       inspected: false,
       exists: null,

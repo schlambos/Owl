@@ -99,6 +99,9 @@ function buildFixture(opts: { drift?: (text: string, canonicalIdentity: string) 
   const service = new BridgeService({
     opencodeConfigDir: configDir,
     projectDirectory: projectDir,
+    // Fixture install root carries the bridge package under the project
+    // dir (canonicalIdentity above stays consistent).
+    owlInstallDirectory: projectDir,
     authorizedRoots: [sandbox],
     revisions: store,
     effectiveViewProvider: async () => {
@@ -141,6 +144,8 @@ function proofDeps(fx: Fixture, overrideActive = false) {
     store: fx.store,
     opencodeConfigDir: fx.configDir,
     projectDirectory: fx.projectDir,
+    // Fixture bridge package is co-located under the project dir.
+    owlInstallDirectory: fx.projectDir,
     authorizedRoots: [fx.sandbox],
     overrideActive,
   };
@@ -391,6 +396,7 @@ describe("drift proof: file/content failures", () => {
         store: fx.store,
         opencodeConfigDir: fx.configDir,
         projectDirectory: fx.projectDir,
+        owlInstallDirectory: fx.projectDir,
         authorizedRoots: [join(fx.sandbox, "nowhere")],
         overrideActive: false,
       },

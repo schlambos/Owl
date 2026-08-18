@@ -1,116 +1,269 @@
-# OMO Control Plane
+# Owl
 
-Local engineering control plane for **OpenCode** + **Oh My OpenCode Slim**.
+**A local control plane for [OpenCode](https://opencode.ai/) and [Oh My OpenCode Slim](https://www.npmjs.com/package/oh-my-opencode-slim).**
 
-Product model: **Desired → Effective → Live**.
+[![Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Status](https://img.shields.io/badge/status-early%20release-orange.svg)
+![Local first](https://img.shields.io/badge/runtime-local--first-2f855a.svg)
 
-See `PLAN.md` for full scope. Recon notes live in `docs/recon/`.
+Owl gives you one place to configure your agent team, understand which settings win, and inspect what OpenCode is running. It is built for setups with multiple providers, specialist agents, fallback chains, presets, prompt files, permissions, background workers, and project overrides.
 
-## Status
+Owl organizes that state into three layers:
 
-**Slice 1 (read-only):** backend + minimal UI for health, providers/models, agents (desired/effective/live), and session trees.
+> **Desired → Effective → Live**
+> What you configured → what OMO-Slim resolved → what OpenCode is actually running
 
-**Slice 2 (live SSE):** in-memory runtime store bootstrapped from REST, updated from OpenCode `GET /event`, exposed to the browser via `GET /api/events`. See `docs/architecture/11-sse-runtime-slice.md`.
+![Owl overview showing environment health, OpenCode connectivity, OMO-Slim configuration, runtime status, and model health](docs/images/product/owl-overview.png)
 
-**Slice 3 (session inspector):** split Sessions workspace with deep detail — messages, tool activity, diff, permissions, parent/child nav, Desired/Effective/Live model compare. See `docs/architecture/12-session-inspector-slice.md`.
+> [!IMPORTANT]
+> Owl is an early, opinionated, local engineering tool. It binds to loopback by default and is designed for a personal workstation or homelab, not an internet-facing multi-user service.
 
-**Slice 4 (provenance + prompts):** field-level Desired→Effective provenance, prompt file discovery/composition, Config workspace. See `docs/architecture/13-provenance-prompts-slice.md`.
+## Why Owl
 
-**Slice 5 (safe writes):** agent model + variant mutations with JSONC-preserving atomic writes, simulate/apply, SQLite revisions, restore. See `docs/architecture/14-safe-config-writes-slice.md`.
+- **Stop spelunking through JSONC.** Edit agents, model chains, presets, prompts, capabilities, and system settings through purpose-built screens.
+- **See why a value won.** Follow settings back through defaults, presets, user config, project config, and root overrides.
+- **Compare config with reality.** Put assigned, effective, and live model state next to each other instead of assuming they match.
+- **Change configuration safely.** Preview schema-validated candidates, write atomically, retain JSONC structure, and restore earlier revisions.
+- **Observe the runtime.** Inspect providers, models, sessions, specialist children, tool activity, background jobs, fallback behavior, and reusable workers.
+- **Keep it local.** Owl reads your existing OpenCode and OMO-Slim setup directly and stores its own revision/probe data on the selected project.
 
-**Slice 6 (capabilities):** temperature, skills, MCPs, permissions + capability matrix. See `docs/architecture/15-agent-capabilities-slice.md`.
+## Product tour
 
-**Slice 7 (prompts):** inline/orchestratorPrompt + prompt-file create/edit/delete with composition preview. See `docs/architecture/16-prompt-editing-slice.md`.
+### Your environment at a glance
 
-**Slice 8 (presets):** inventory, comparison, runtime-switch impact, create/clone/rename/delete lifecycle. Runtime preset observability documented as not exposed. See `docs/architecture/17-presets-slice.md`.
+Overview combines connection health, team state, sessions, providers, model health, OMO-Slim status, and the most important Doctor findings.
 
-**Slice 9 (system):** global OMO config — disabled lists, backgroundJobs, fallback, image_routing, stripOrchestratorModel, UI/startup, option coverage matrix. See `docs/architecture/18-global-system-config-slice.md`.
+![Owl Overview workspace](docs/images/product/owl-overview.png)
 
-**Slice 10 (council):** councillor presets lifecycle, member model/variant/prompt, coordinator separation, runtime session visibility. See `docs/architecture/19-council-slice.md`.
+### The whole agent team
 
-**Slice 11 (ACP):** external ACP agents — lifecycle, command/args/env/cwd/wrapperModel/permissionMode/timeout editing, command probing, explicit handshake probe, secret-safe revisions. See `docs/architecture/20-acp-agents-slice.md`.
+The Agents workspace shows each assignment, its source, and its health signals. When Assigned, Effective, and Live agree, the row stays compact; overrides and runtime drift expand into distinct states.
 
-**Slice 12 (Doctor):** unified rule-based diagnostics across all subsystems with stable IDs, evidence, severity policy, prerequisite gating, and a `GET /api/doctor` consolidation + Doctor workspace. Includes correction of a fabricated builtin-agent roster entry found by Doctor itself. See `docs/architecture/21-doctor-consolidation-slice.md`.
+![Owl Agents workspace showing an assignment-first agent roster](docs/images/product/owl-agents.png)
 
-**Slice 13 (Companion + Interview inspection):** read-only subsystem support with installed-source-verified schemas (8 companion fields incl. gifPack/loopStyle/speed/debug; 5 interview fields), effective/provenance resolution, scope-guarded binary path display (never inspected outside authorized roots), non-inspected output paths, honest runtime non-observability, conservative Doctor categories, option-capability matrix (readable/resolved/provenance/editable/runtime-observable/runtime-controllable/doctor), System UI subsections, `/api/system/companion` and `/api/system/interview`. No subsystem launched. See `docs/architecture/22-companion-interview-inspection-slice.md`.
+### Explainable configuration
 
-**Slice 14 (OMO runtime telemetry):** source-verified feasibility audit of installed OMO state (closure/module/globalThis/REST-reachable classification), patch-free two-track bridge — derive track from persisted OpenCode task-tool parts (jobs, workers, statuses, resume evidence) + opt-in in-process bridge plugin for the four globalThis registries (fallback in-flight, wake gate, multiplexer, cmux). Versioned schema (v1), whitelisted security, graceful absence, Sessions/Inspector/Agents/Overview/Doctor integration, 224+19 tests. See `docs/architecture/23-omo-runtime-telemetry-slice.md`.
+Inspect effective values, provenance, schema state, raw JSONC, diffs, and revisions without losing access to the underlying files.
 
-**Slice 14.5 (agent editor remediation):** makes agent-model reassignment a real Agents-workspace workflow. Root cause: Slice 5 backend + minimal modal existed, but free-text-first selection, incomplete chain seeding (fallback collapse), provenance-ignorant destination defaults, and missing detail-panel Edit made the product path unusable. UI rewrite reuses existing simulate/apply/revision/provenance/providers APIs; catalog-first provider→model cascade; ordered fallback chain with per-entry variants; explicit write destination; masked-write explanation; revision restore; web component tests (8). Live browser Explorer reassignment + restore verified. See `docs/architecture/24-agent-editor-remediation.md`.
+![Owl Configuration workspace showing effective OMO-Slim settings and their sources](docs/images/product/owl-config-or-sessions.png)
 
-**Slice 15 (model availability, entitlement probing, provider diagnostics, agent-assignment validation):** explicit-only minimal-inference model probes through isolated tagged OpenCode sessions (deny-all permissions, 20s hard deadline, `provider\0model`-deduped queue with freshness skip and tiered batch guards); sanitized SQLite probe history with retention, startup finalization, and degraded-overlay persistence; deterministic capability composition (known/partial/unknown with a source-authority freeze on invented fields); composite provider diagnostics; probe-aware Doctor rules (Orchestrator escalation, provider-down root-cause dedup, capability mismatch, unadvertised advisories) plus a model-health roll-up; Models workspace inventory UI and probe badges across Agents/Council/ACP surfaces with non-blocking [Test] actions. Adjunct: `providerModelRules` single-sourced on the shared usage map; probe sessions excluded from every default surface with explicit opt-in. 353+31 tests. See `docs/architecture/25-model-probing-provider-diagnostics.md`.
+## What Owl offers
 
-**Slice 16 (multiplexer configuration & read-only runtime visibility):** source-authority documentation of the installed `multiplexer` schema (four fields, exact enums/ranges/defaults), user/project deep-merge provenance, auto-detection factory order with env-only signals, static `command -v` allowlist, per-backend layout semantics, legacy top-level `tmux` ignored/not-aliased, optional telemetry bridge v1/v2 with exact whitelisted store fields (no directory/owner/timestamps/promises), OMO job→child-session→pane correlation with 60s authoritative grace, typed `GlobalMutation` writes through simulate/apply/revision/restore, conservative Doctor rules, and read-only UI surfaces (System → Multiplexer, Session Inspector, OMO Jobs, Agents/Overview summary, Doctor deep-links). No runtime control, no pane create/delete/focus/move/rename/attach/detach/kill/capture/scrollback, no Companion/Interview writes. 515+138 tests, typechecks/build clean. See `docs/architecture/27-multiplexer-slice.md`.
+Owl groups day-to-day work into configuration, explainability, and runtime visibility.
 
-**Side slice (Agents assignment UI / IA, critic-approved redesign):** the Agents workspace is an assignment-first control surface with exactly five columns (Agent | Assignment | Source | Signals | Actions). Assigned / Effective / Live are user-facing; identical layers compress to one quiet line; assignment override vs runtime drift expand as distinct states; the agent-name button opens a true-modal detail drawer (focus-trapped, inert background, URL-synced); adverse model health covers primary + fallback probes; ownership routes link council/ACP/native rows to their workspaces; filter/search/sort/selection state lives in the URL. Frontend-only — no mutation/schema change. Slice 16 remains paused. See `docs/architecture/28-agents-ui-redesign.md`.
+### Configuration
 
-**Slice 26 (schema-safe config writes remediation):** installed-`oh-my-opencode-slim` JSON Schema (draft 2020-12) loaded dynamically from `node_modules` (version+sha256-cached AJV compiler, auto-recompile on package/schema update) plus supplemental dist-evidence parity checks (`parity.ts`); every OMO JSON writer validates the FULL candidate document twice (post-mutation pre-temp-write, post-reread pre-rename) — no invalid candidate reaches the atomic rename, no successful revision is created, failure → HTTP 422 (distinct from 409/400); schema unavailable → ALL writes fail closed (reads continue). Canonical `serializeOmoAgentModel` (1 entry → string + sibling variant, 2+ → ordered array; never standalone object, never one-element array); `agent-model` payload now always `ModelChainEntry[]`. Revision restore validates historical content against the CURRENT installed schema and blocks incompatible restores. `GET /api/omo/schema` status; web preview "OMO-Slim schema validation ✓/✕" with Apply gated on candidate validity; global banner for current-config-invalid (repair edits still possible); System schema-health panel; Doctor `config.schema` rule with capped ≤50-revision incompatibility audit. Root cause: UI `serializeEntry` + `buildModelMutation` 1-entry collapse emitted standalone `{id, variant}` for `agents.critic` → installed 2.2.10 rejected entire config at startup; tolerant `normalizeModelField` masked the violation. 373+37 tests. Live critic-chain apply + restore verified (sha256-exact, doctor exit 0). See `docs/architecture/26-schema-safe-config-writes-remediation.md`.
+- Built-in and custom agent assignments
+- Primary models, ordered fallback chains, variants, and provider options
+- User and project presets with comparisons and lifecycle actions
+- Prompt replacement, append files, effective composition, and source inspection
+- Skills, Model Context Protocol (MCP) servers, tools, permissions, and global availability controls
+- Council coordinator and councillor preset management
+- External ACP agent configuration and command/handshake probing
+- Raw Monaco-based OpenCode and OMO-Slim configuration editing
+- Installed OMO-Slim schema loading, validation, and coverage auditing
 
-**Slice 17 (telemetry bridge activation):** safe managed registration/removal/restart pipeline for the optional `packages/omo-telemetry-bridge` OpenCode plugin. The control plane writes the bridge plugin entry to `opencode.json`/`opencode.jsonc` via atomic JSONC byte-patch revisions, then requires an explicit dashboard-owned restart to load/unload it. Two-step workflow: preview → apply (no runtime action), then separate `POST /api/opencode/bridge/restart` with `confirmation: "restart-owned-bridge"` and generation/hash/revision guards. Managed loopback port range `8788..8803`; never kills existing listeners; activation nonce is reduced to a SHA-256 fingerprint in all DTOs/events/logs; the raw nonce exists only inside the synchronous launch-boundary scope. API routes under `/api/opencode/bridge/*`; SSE event `telemetry-bridge.updated` on `/api/events`; web UI in System → Telemetry Bridge. Probe endpoint returns `501 bridge-probe-inapplicable`; tuple plugin specs are recognized but the management path uses the env/string foundation fallback. Validation: server 824 pass / 0 fail, web 163 pass / 0 fail, focused telemetry UI 25 pass / 0 fail, repo typecheck all exit 0. **Critical limitation:** no live config mutation, no live managed-runtime restart, and no real bridge connection probe/activation were performed. See `docs/architecture/evidence/telemetry-bridge-activation/manifest.md`.
+### Safety and explainability
 
-**Managed OpenCode runtime (backend lifecycle remediation):** `bun run dev` is now the default one-command workflow (server + frontend under a single signal-coordinating supervisor). The control plane owns the OpenCode backend lifecycle in Managed mode (default) — it probes `:4096`, reuses a compatible preexisting backend, or starts one via the installed SDK (`createOpencodeServer`), and cleanly stops the owned backend on shutdown. Attach mode (`OPENCODE_BASE_URL`) never owns/stops the external server. No separate `opencode serve` prerequisite. See `docs/architecture/30-managed-opencode-runtime.md`.
+- Desired, Effective, and Live state comparisons
+- Field-level provenance and masked-override explanations
+- Candidate simulation before writes
+- JSONC-preserving, schema-validated atomic writes
+- Local revision history and restore
+- Rule-based Doctor diagnostics with evidence and deep links
+- Explicit model probes with isolated sessions, timeouts, and stored results
 
-**Slice 18 (configuration completion):** typed Interview writes for the current installed five-field set (version/hash/source gated), a schema-aware raw OMO workspace on logical `user-omo` / `project-omo` sources only, one physical OMO JSON transaction, OMO revisions, Doctor deep links, and `bun run audit:omo-schema` coverage of the live installed schema. System coverage: **Interview is editable** (when the installed audit matches); **Companion is read-only / intentionally not developed further**. Live reversible browser proofs are not claimed in-repo until the parent/verifier records them. See `docs/architecture/32-configuration-completion.md`.
+### Runtime visibility
 
-## Quick start
+- Live OpenCode connection and provider/model inventory
+- Server-Sent Events (SSE) instead of aggressive polling
+- Session hierarchy with parent/child navigation
+- Messages, tool activity, file changes, diffs, permissions, and token/context details
+- OMO background jobs, specialist workers, session reuse, and fallback telemetry where available
+- Terminal multiplexer detection and pane correlation
+- Optional Owl telemetry bridge for OMO-Slim state that OpenCode does not expose directly
 
-Prerequisites: Bun, `@opencode-ai/sdk@1.18.14` installed under the active OpenCode config dir (`~/.config/opencode/node_modules`), and OMO-Slim installed in that config.
+## What Owl is not
+
+Owl is a control surface over OpenCode and OMO-Slim. It does not replace either runtime.
+
+It is also not:
+
+- hosted software as a service (SaaS);
+- a multi-user control plane;
+- a generic drag-and-drop agent workflow builder;
+- a model-provider abstraction;
+- a mobile app; or
+- a reason to expose your OpenCode configuration service to the public internet.
+
+## Get started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/)
+- A working OpenCode installation
+- Oh My OpenCode Slim installed in the active OpenCode config directory
+- `@opencode-ai/sdk@1.18.14` available under that config directory's `node_modules`
+
+Owl currently targets the OpenCode SDK version above and loads the installed OMO-Slim schema at runtime. Your active OpenCode config directory must already exist.
+
+### Clone and run
 
 ```bash
+git clone https://github.com/schlambos/Owl.git
+cd Owl
 bun install
 bun run dev
 ```
 
-`bun run dev` starts both the server and the frontend under a single supervisor that forwards SIGINT/SIGTERM so the server can shut down cleanly and close its owned OpenCode backend. It does **not** spawn `opencode serve`.
+Open the [Owl UI](http://127.0.0.1:5173).
 
-- UI: http://127.0.0.1:5173  
-- API: http://127.0.0.1:8787/api/overview  
-- Runtime: http://127.0.0.1:8787/api/runtime  
-- Live events: http://127.0.0.1:8787/api/events  
-- Lifecycle: http://127.0.0.1:8787/api/opencode/lifecycle  
+`bun run dev` starts the Owl API, web app, and Managed OpenCode lifecycle under one signal-aware supervisor:
 
-### OpenCode backend modes
+- Owl UI: `http://127.0.0.1:5173`
+- Owl API: `http://127.0.0.1:8787`
+- Preferred Managed OpenCode address: `http://127.0.0.1:4096`
 
-The control plane selects how it talks to the OpenCode backend based on `OPENCODE_BASE_URL`:
-
-| Mode | When | Behavior |
-|------|------|---------|
-| **Managed** (default) | `OPENCODE_BASE_URL` unset | The control plane owns the OpenCode backend lifecycle. It probes `127.0.0.1:4096`, reuses a compatible preexisting backend if found, or starts one via the installed SDK (`createOpencodeServer`). It owns, restarts, and stops the backend it started. No separate `opencode serve` is required. |
-| **Attach** | `OPENCODE_BASE_URL=http://host:port` | The control plane attaches to that explicit external OpenCode server and **never** owns, starts, stops, or replaces it. Loss of the external backend is a terminal failure with Retry, not a restart. |
+With no project override, Owl manages its own checkout because the official launch scripts start the server there. To manage another project:
 
 ```bash
-# Managed (default): control plane owns the backend
-bun run dev
+OMO_CP_PROJECT_DIR=/absolute/path/to/your_project bun run dev
+```
 
-# Attach: use an already-running OpenCode server (e.g. opencode serve)
+For a non-default OpenCode config directory:
+
+```bash
+OPENCODE_CONFIG_DIR=/absolute/path/to/opencode-config \
+OMO_CP_PROJECT_DIR=/absolute/path/to/your_project \
+bun run dev
+```
+
+Both paths must already exist and must be absolute. Owl fails closed on blank, relative, missing, or non-directory roots.
+
+## Managed and Attach modes
+
+Owl has two explicit OpenCode lifecycle modes.
+
+| Mode | Selection | Behavior |
+| --- | --- | --- |
+| **Managed** | `OPENCODE_BASE_URL` is unset | Reuses a compatible server on `127.0.0.1:4096` or starts one through the installed SDK. Owl owns only the process it starts and shuts it down cleanly. |
+| **Attach** | `OPENCODE_BASE_URL=http://host:port` | Connects to an existing OpenCode server. Owl never starts, stops, replaces, or claims ownership of it. |
+
+Attach to an existing server:
+
+```bash
 OPENCODE_BASE_URL=http://127.0.0.1:4096 bun run dev
 ```
 
-The actual canonical backend URL (which may be an OS-selected alternate loopback port if `:4096` is occupied) is reported by `GET /api/opencode/lifecycle` as `baseUrl`. Use that URL to attach the OpenCode TUI to the same runtime:
+To use the OpenCode terminal user interface (TUI) against Owl's Managed runtime, read the canonical `baseUrl` from `GET /api/opencode/lifecycle`, then run:
 
 ```bash
-opencode attach <managed-url-from-/api/opencode/lifecycle>
+opencode attach http://127.0.0.1:4096
 ```
 
-> **Warning:** Plain `opencode` (without `attach`) starts the TUI with its own embedded OpenCode runtime, which is independent of the backend the control plane manages. Use `opencode attach <url>` to work in the same runtime.
+Running plain `opencode` starts a separate embedded runtime; it will not share Owl's Managed sessions.
 
-See `docs/architecture/30-managed-opencode-runtime.md` for the full lifecycle state machine, restart policy, and verification procedure.
+## Configuration
 
-### Separate processes
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OMO_CP_PROJECT_DIR` | Server startup directory | Absolute target project containing project-local OMO configuration and Owl state. |
+| `OPENCODE_CONFIG_DIR` | `$HOME/.config/opencode` | Active OpenCode config, installed SDK, OMO-Slim package, and user configuration. |
+| `OPENCODE_BASE_URL` | Unset | Selects Attach mode when present. |
+| `OMO_CP_HOST` | `127.0.0.1` | Owl API bind host. Keep this on loopback unless you understand the security implications. |
+| `OMO_CP_PORT` | `8787` | Owl API port. |
+| `OMO_BRIDGE_BASE_URL` | Unset | Optional validated loopback override for an externally managed OMO telemetry bridge. |
 
-If you prefer hot restart on the server, run the two halves separately (the server's own `dev` script uses `--watch`):
+Owl works with the normal configuration locations:
+
+```text
+$OPENCODE_CONFIG_DIR/opencode.json
+$OPENCODE_CONFIG_DIR/oh-my-opencode-slim.jsonc
+$OPENCODE_CONFIG_DIR/oh-my-opencode-slim/*.md
+/path/to/project/.opencode/oh-my-opencode-slim.jsonc
+/path/to/project/.opencode/oh-my-opencode-slim/*.md
+```
+
+Its local SQLite state is stored under the selected target project:
+
+```text
+/path/to/project/data/control-plane.db
+/path/to/project/data/control-plane-bridge.db
+```
+
+These databases hold Owl revision history, model probe results, and bridge management state. OpenCode and OMO-Slim configuration files remain authoritative.
+
+## Local security model
+
+Owl is powerful because it can read and update local configuration. Its filesystem scope is deliberately narrow.
+
+At startup, Owl resolves exactly three authorized roots:
+
+1. the Owl install directory;
+2. the selected target project; and
+3. the active OpenCode config directory.
+
+The roots are absolute, canonicalized, and deduplicated. Browser requests cannot supply arbitrary filesystem roots. Project writes remain constrained to project configuration targets, while user writes remain constrained to the OpenCode config directory.
+
+Other safety properties include:
+
+- loopback network defaults;
+- schema validation before authoritative OMO writes;
+- temporary-file and reread validation before atomic rename;
+- secret redaction in API errors and diagnostics;
+- isolated, explicit-only model probes; and
+- no automatic execution of arbitrary project ACP commands during discovery.
+
+## How it works
+
+```mermaid
+flowchart LR
+    Browser[Owl web UI] -->|REST + SSE| Server[Owl local server]
+    Server -->|lifecycle + runtime API| OpenCode[OpenCode server]
+    OpenCode --> OMO[OMO-Slim plugin]
+    Server --> Config[OpenCode + OMO config files]
+    Server --> State[Local SQLite state]
+    Bridge[Optional telemetry bridge] --> Server
+```
+
+The repository is a Bun workspace:
+
+```text
+apps/web                      React 19 + TypeScript + Vite
+apps/server                   Bun HTTP server + SQLite + JSONC tooling
+packages/shared               Shared REST/SSE contracts
+packages/omo-telemetry-bridge Optional OpenCode plugin
+```
+
+The browser never edits configuration files directly. All parsing, resolution, validation, write transactions, backups, runtime communication, and filesystem checks live in the local server.
+
+## Development
 
 ```bash
-bun run dev:server   # http://127.0.0.1:8787 (with --watch)
-bun run dev:web       # http://127.0.0.1:5173
+# Unified development supervisor
+bun run dev
+
+# Run each side separately
+bun run dev:server
+bun run dev:web
+
+# Validation
+bun run typecheck
+bun run build
+bun test
+bun run audit:omo-schema
 ```
 
+The deeper implementation notes live in [`docs/architecture`](docs/architecture/README.md). [`PLAN.md`](PLAN.md) records the complete product direction and design constraints.
 
-## Filesystem scope
+## Project status
 
-This project only reads:
+Owl is at `0.1.0` and is being released as a working early-stage project. The main configuration, safety, diagnostics, model, agent, runtime, Council, ACP, and system-management surfaces are implemented, but OpenCode and OMO-Slim continue to evolve.
 
-1. `~/Repos/omo-slim`
-2. Active OpenCode config dir (`~/.config/opencode` or `OPENCODE_CONFIG_DIR`)
+Owl prefers an honest `unknown` or `unavailable` state over inventing runtime data that the installed versions do not expose. Expect version-specific limitations around some OMO-Slim runtime details.
 
-Runtime session metadata may reference other paths; those paths are not opened.
+Issues and pull requests are welcome. For larger changes, please keep the local-first model, strict filesystem boundaries, and Desired → Effective → Live distinction intact.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).

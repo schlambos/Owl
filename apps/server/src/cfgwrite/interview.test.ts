@@ -16,6 +16,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type {
   InterviewCommitResponse,
@@ -53,8 +54,12 @@ import {
 import { fingerprintAuthorizedSource } from "../omo-schema/fingerprint";
 
 const ROOT = join(import.meta.dir, "../../test/interview-d2-sandbox");
-const REAL_SCHEMA_PATH =
-  "/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/oh-my-opencode-slim.schema.json";
+const REAL_SCHEMA_PATH = join(
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode"),
+  "node_modules",
+  "oh-my-opencode-slim",
+  "oh-my-opencode-slim.schema.json",
+);
 const REAL_SCHEMA_TEXT = existsSync(REAL_SCHEMA_PATH)
   ? readFileSync(REAL_SCHEMA_PATH, "utf-8")
   : null;

@@ -46,11 +46,11 @@ function setupBridgeDir(root: string): string {
 
 describe("detectIdentityKind", () => {
   test("absolute path → path", () => {
-    expect(detectIdentityKind("/Users/matt/foo")).toBe("path");
+    expect(detectIdentityKind("/tmp/owl-fixture/foo")).toBe("path");
   });
 
   test("file:// URL → file-url", () => {
-    expect(detectIdentityKind("file:///Users/matt/foo")).toBe("file-url");
+    expect(detectIdentityKind("file:///tmp/owl-fixture/foo")).toBe("file-url");
   });
 
   test("bare npm name → npm", () => {
@@ -76,42 +76,42 @@ describe("detectIdentityKind", () => {
 
 describe("normalizePathIdentity", () => {
   test("absolute path within roots → path", () => {
-    const r = normalizePathIdentity("/Users/matt/Repos/omo-slim/foo", [
-      "/Users/matt/Repos/omo-slim",
+    const r = normalizePathIdentity("/tmp/owl-fixture/repo/foo", [
+      "/tmp/owl-fixture/repo",
     ]);
-    expect(r.path).toBe("/Users/matt/Repos/omo-slim/foo");
+    expect(r.path).toBe("/tmp/owl-fixture/repo/foo");
   });
 
   test("absolute path outside roots → outside-roots", () => {
-    const r = normalizePathIdentity("/etc/passwd", ["/Users/matt/Repos/omo-slim"]);
+    const r = normalizePathIdentity("/etc/passwd", ["/tmp/owl-fixture/repo"]);
     expect(r.path).toBeNull();
     if (r.path === null) expect(r.reason).toBe("outside-roots");
   });
 
   test("file:// URL within roots → path", () => {
-    const r = normalizePathIdentity("file:///Users/matt/Repos/omo-slim/foo", [
-      "/Users/matt/Repos/omo-slim",
+    const r = normalizePathIdentity("file:///tmp/owl-fixture/repo/foo", [
+      "/tmp/owl-fixture/repo",
     ]);
-    expect(r.path).toBe("/Users/matt/Repos/omo-slim/foo");
+    expect(r.path).toBe("/tmp/owl-fixture/repo/foo");
   });
 
   test("relative → not-path-like", () => {
-    const r = normalizePathIdentity("./foo", ["/Users/matt/Repos/omo-slim"]);
+    const r = normalizePathIdentity("./foo", ["/tmp/owl-fixture/repo"]);
     expect(r.path).toBeNull();
     if (r.path === null) expect(r.reason).toBe("not-path-like");
   });
 
   test("npm name → not-path-like", () => {
-    const r = normalizePathIdentity("oh-my-opencode-slim", ["/Users/matt/Repos/omo-slim"]);
+    const r = normalizePathIdentity("oh-my-opencode-slim", ["/tmp/owl-fixture/repo"]);
     expect(r.path).toBeNull();
     if (r.path === null) expect(r.reason).toBe("not-path-like");
   });
 
   test("trailing slash stripped", () => {
-    const r = normalizePathIdentity("/Users/matt/Repos/omo-slim/foo/", [
-      "/Users/matt/Repos/omo-slim",
+    const r = normalizePathIdentity("/tmp/owl-fixture/repo/foo/", [
+      "/tmp/owl-fixture/repo",
     ]);
-    expect(r.path).toBe("/Users/matt/Repos/omo-slim/foo");
+    expect(r.path).toBe("/tmp/owl-fixture/repo/foo");
   });
 });
 
@@ -318,10 +318,10 @@ describe("arePluginEntriesEquivalent", () => {
   });
 });
 
-describe("canonicalBridgeDir", () => {
-  test("returns joined path under project root", () => {
-    const dir = canonicalBridgeDir("/Users/matt/Repos/omo-slim");
-    expect(dir).toBe("/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge");
+describe("canonicalBridgeDir (Owl install root)", () => {
+  test("returns joined path under the install root", () => {
+    const dir = canonicalBridgeDir("/tmp/owl-fixture/install-root");
+    expect(dir).toBe("/tmp/owl-fixture/install-root/packages/omo-telemetry-bridge");
   });
 
   test("returns realpath when exists", () => {
@@ -329,5 +329,17 @@ describe("canonicalBridgeDir", () => {
     const dir = canonicalBridgeDir(sandbox);
     expect(existsSync(dir)).toBe(true);
     expect(realpathSync(dir)).toBe(realpathSync(bridgeDir));
+  });
+
+  test("identity follows the install root, not a target project directory", () => {
+    const installRoot = mkdtempSync(join(tmpdir(), "owl-install-"));
+    try {
+      const bridgeDir = setupBridgeDir(installRoot);
+      // The sandbox "project" dir exists too but carries no bridge package.
+      expect(existsSync(join(sandbox, "packages", "omo-telemetry-bridge"))).toBe(false);
+      expect(canonicalBridgeDir(installRoot)).toBe(realpathSync(bridgeDir));
+    } finally {
+      rmSync(installRoot, { recursive: true, force: true });
+    }
   });
 });

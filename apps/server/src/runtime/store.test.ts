@@ -15,8 +15,8 @@ function lifecycle(
     status: "connected",
     baseUrl,
     generation,
-    projectDirectory: "/Users/matt/Repos/omo-slim",
-    configDirectory: "/Users/matt/.config/opencode",
+    projectDirectory: "/tmp/owl-fixture/project",
+    configDirectory: "/tmp/owl-fixture/opencode",
     authConfigured: false,
     ready: {
       health: true,
@@ -48,7 +48,7 @@ describe("RuntimeStore backend generations", () => {
       urls.push(url);
       const path = new URL(url).pathname;
       if (path === "/global/health") return json({ healthy: true, version: "1.18.14" });
-      if (path === "/path") return json({ directory: "/Users/matt/Repos/omo-slim" });
+      if (path === "/path") return json({ directory: "/tmp/owl-fixture/project" });
       if (path === "/project/current") return json({ id: "project" });
       if (path === "/agent") return json([{ name: "orchestrator" }]);
       if (path === "/session") return json([{ id: url.includes("second") ? "new" : "old" }]);
@@ -59,7 +59,7 @@ describe("RuntimeStore backend generations", () => {
       return json({});
     }) as unknown as typeof fetch;
     try {
-      const store = new RuntimeStore("/Users/matt/Repos/omo-slim");
+      const store = new RuntimeStore("/tmp/owl-fixture/project");
       await store.activateBackend(lifecycle(1, "http://first"));
       expect(store.getRuntimeState().sessions.flat.map((s) => s.id)).toEqual(["old"]);
       await store.activateBackend(lifecycle(2, "http://second"));

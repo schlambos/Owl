@@ -23,8 +23,8 @@ function baseInput(overrides: Partial<DoctorInput> = {}): DoctorInput {
       baseUrl: "http://x",
       version: "1.18.14",
       generation: 1,
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      configDirectory: "/Users/matt/.config/opencode",
+      projectDirectory: "/tmp/owl-fixture/project",
+      configDirectory: "/tmp/owl-fixture/opencode",
       authConfigured: false,
       ready: {
         health: true,

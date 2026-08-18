@@ -130,6 +130,13 @@ function cryptoId(prefix: string): string {
 export interface BridgeServiceOptions {
   opencodeConfigDir: string;
   projectDirectory: string;
+  /**
+   * Owl install root (omo-control-plane repository). The managed bridge
+   * package identity is `<owlInstallDirectory>/packages/omo-telemetry-bridge`;
+   * `projectDirectory` remains the target OpenCode/OMO project for candidate
+   * sources and logical write scoping.
+   */
+  owlInstallDirectory: string;
   authorizedRoots: string[];
   revisions: BridgeRevisionStore;
   probe?: PortProbe;
@@ -168,7 +175,8 @@ export class BridgeService {
   private readonly realRoots: string[];
   private readonly realConfigDir: string;
   private readonly realProjectDir: string;
-  private readonly previewRegistry: Map<string, PreviewRecord> = new Map();
+  private readonly realOwlInstallDir: string;
+  private readonly previewRegistry: Map<string, PreviewRecord>;
   private watcherHook: WatcherHook | null = null;
 
   constructor(opts: BridgeServiceOptions) {
@@ -177,6 +185,8 @@ export class BridgeService {
     this.realRoots = realpathRoots(opts.authorizedRoots);
     this.realConfigDir = realpathIfExists(opts.opencodeConfigDir);
     this.realProjectDir = realpathIfExists(opts.projectDirectory);
+    this.realOwlInstallDir = realpathIfExists(opts.owlInstallDirectory);
+    this.previewRegistry = new Map();
   }
 
   /** Set the watcher hook for self-write suppression arming (oracle decision 9). */
@@ -224,6 +234,7 @@ export class BridgeService {
       {
         opencodeConfigDir: this.realConfigDir,
         projectDirectory: this.realProjectDir,
+        owlInstallDirectory: this.realOwlInstallDir,
         authorizedRoots: this.realRoots,
       },
       effectiveView,
@@ -234,11 +245,13 @@ export class BridgeService {
     }
 
     const candidate = resolverResult.candidate;
-    const canonicalIdentity = canonicalBridgeDir(this.realProjectDir);
+    // Bridge package identity derives from the Owl install root, not the
+    // target project directory.
+    const canonicalIdentity = canonicalBridgeDir(this.realOwlInstallDir);
 
     // For add: verify canonical bridge is recognized.
     if (req.operation === "add") {
-      const canonicalCheck = resolveCanonicalBridge(canonicalIdentity, this.realProjectDir, this.realRoots);
+      const canonicalCheck = resolveCanonicalBridge(canonicalIdentity, this.realOwlInstallDir, this.realRoots);
       if (!canonicalCheck.isCanonical) {
         return this.previewError(req.operation, [
           { code: "env-scope-unproven", message: "Canonical bridge directory not resolvable under authorized roots." },
@@ -366,6 +379,7 @@ export class BridgeService {
       {
         opencodeConfigDir: this.realConfigDir,
         projectDirectory: this.realProjectDir,
+        owlInstallDirectory: this.realOwlInstallDir,
         authorizedRoots: this.realRoots,
       },
       freshView,
@@ -639,6 +653,7 @@ export class BridgeService {
         store: this.opts.revisions,
         opencodeConfigDir: this.realConfigDir,
         projectDirectory: this.realProjectDir,
+        owlInstallDirectory: this.realOwlInstallDir,
         authorizedRoots: this.opts.authorizedRoots,
         overrideActive: opts.overrideActive,
       },
@@ -748,6 +763,7 @@ export class BridgeService {
         store: this.opts.revisions,
         opencodeConfigDir: this.realConfigDir,
         projectDirectory: this.realProjectDir,
+        owlInstallDirectory: this.realOwlInstallDir,
         authorizedRoots: this.opts.authorizedRoots,
         overrideActive: opts.overrideActive,
       },

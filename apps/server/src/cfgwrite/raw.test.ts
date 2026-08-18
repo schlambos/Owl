@@ -11,6 +11,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   isRawCommitResponse,
@@ -44,10 +45,20 @@ import {
 import { createSourceWatcher } from "./source-watcher";
 
 const ROOT = join(import.meta.dir, "../../test/raw-d3-sandbox");
-const REAL_SCHEMA_PATH =
-  "/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/oh-my-opencode-slim.schema.json";
-const REAL_PKG_PATH =
-  "/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim/package.json";
+const REAL_CONFIG_DIR =
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
+const REAL_SCHEMA_PATH = join(
+  REAL_CONFIG_DIR,
+  "node_modules",
+  "oh-my-opencode-slim",
+  "oh-my-opencode-slim.schema.json",
+);
+const REAL_PKG_PATH = join(
+  REAL_CONFIG_DIR,
+  "node_modules",
+  "oh-my-opencode-slim",
+  "package.json",
+);
 const REAL_SCHEMA_TEXT = existsSync(REAL_SCHEMA_PATH)
   ? readFileSync(REAL_SCHEMA_PATH, "utf-8")
   : null;

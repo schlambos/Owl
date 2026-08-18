@@ -1,10 +1,6 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
 import type { ServerConfig } from "../config";
-import {
-  MANAGED_PROJECT_DIRECTORY,
-  DEFAULT_OPENCODE_CONFIG_DIRECTORY,
-  PREFERRED_OPENCODE_BASE_URL,
-} from "../config";
+import { PREFERRED_OPENCODE_BASE_URL } from "../config";
 import {
   OpenCodeLifecycleManager,
   computeBridgeReconciliationClean,
@@ -19,7 +15,7 @@ import { BridgeService } from "../opencode-bridge/service";
 import { createBridgeWatcher } from "../opencode-bridge/watcher";
 import { fingerprintNonce } from "../opencode-bridge/extractor";
 import { hashContent } from "../cfgwrite/jsonc-edit";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -34,6 +30,31 @@ const ready: LifecycleProbeResult["readiness"] = {
   sse: false,
 };
 
+// ── Neutral existing directories for lifecycle ServerConfigs ───────────
+// The lifecycle manager materializes these into env/state only; no
+// personal-machine paths and no bridge package layout is required.
+let lifecycleCfgRoot: string;
+let TEST_INSTALL_DIR: string;
+let TEST_PROJECT_DIR: string;
+let TEST_CONFIG_DIR: string;
+
+beforeAll(() => {
+  lifecycleCfgRoot = mkdtempSync(join(tmpdir(), "omo-lifecycle-cfgdir-"));
+  const installDir = join(lifecycleCfgRoot, "install");
+  const projDir = join(lifecycleCfgRoot, "proj");
+  const cfgDir = join(lifecycleCfgRoot, "cfg");
+  mkdirSync(installDir, { recursive: true });
+  mkdirSync(projDir, { recursive: true });
+  mkdirSync(cfgDir, { recursive: true });
+  TEST_INSTALL_DIR = realpathSync(installDir);
+  TEST_PROJECT_DIR = realpathSync(projDir);
+  TEST_CONFIG_DIR = realpathSync(cfgDir);
+});
+
+afterAll(() => {
+  try { rmSync(lifecycleCfgRoot, { recursive: true, force: true }); } catch { /* */ }
+});
+
 function cfg(
   mode: "managed" | "attach",
   url?: string,
@@ -43,9 +64,10 @@ function cfg(
     port: 8787,
     opencodeMode: mode,
     ...(mode === "attach" ? { opencodeAttachBaseUrl: url } : {}),
-    opencodeConfigDir: DEFAULT_OPENCODE_CONFIG_DIRECTORY,
-    projectDirectory: MANAGED_PROJECT_DIRECTORY,
-    authorizedRoots: [MANAGED_PROJECT_DIRECTORY, DEFAULT_OPENCODE_CONFIG_DIRECTORY],
+    opencodeConfigDir: TEST_CONFIG_DIR,
+    projectDirectory: TEST_PROJECT_DIR,
+    owlInstallDirectory: TEST_INSTALL_DIR,
+    authorizedRoots: [TEST_INSTALL_DIR, TEST_PROJECT_DIR, TEST_CONFIG_DIR],
   };
 }
 
@@ -220,7 +242,7 @@ describe("OpenCodeLifecycleManager", () => {
       },
       startSdk: async (opts) => {
         requested = opts;
-        expect(process.env.OPENCODE_CONFIG_DIR).toBe(DEFAULT_OPENCODE_CONFIG_DIRECTORY);
+        expect(process.env.OPENCODE_CONFIG_DIR).toBe(TEST_CONFIG_DIR);
         return { url: PREFERRED_OPENCODE_BASE_URL, close() {} };
       },
       portBindable: async () => true,
@@ -1187,9 +1209,10 @@ describe("external-edit / missing-field owned-start gating (integration)", () =>
     // The service reconcile classifies missing mandatory committed state as
     // recovery-pending.
     const service = new BridgeService({
-      opencodeConfigDir: DEFAULT_OPENCODE_CONFIG_DIRECTORY,
-      projectDirectory: MANAGED_PROJECT_DIRECTORY,
-      authorizedRoots: [MANAGED_PROJECT_DIRECTORY, DEFAULT_OPENCODE_CONFIG_DIRECTORY],
+      opencodeConfigDir: TEST_CONFIG_DIR,
+      projectDirectory: TEST_PROJECT_DIR,
+      owlInstallDirectory: TEST_INSTALL_DIR,
+      authorizedRoots: [TEST_INSTALL_DIR, TEST_PROJECT_DIR, TEST_CONFIG_DIR],
       revisions: store,
       effectiveViewProvider: async () => {
         throw new Error("not needed");

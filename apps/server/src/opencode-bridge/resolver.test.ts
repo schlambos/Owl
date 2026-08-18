@@ -4,6 +4,7 @@
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -60,9 +61,12 @@ function matchingView(text: string): EffectivePluginView {
   return view(entries);
 }
 
+// Legacy fixtures keep the bridge package co-located under the project
+// dir, so the fixture "install root" defaults to the project dir.
 const opts = () => ({
   opencodeConfigDir: configDir,
   projectDirectory: projectDir,
+  owlInstallDirectory: projectDir,
   authorizedRoots: [configDir, projectDir],
 });
 
@@ -234,6 +238,47 @@ describe("resolveAuthorizedCandidate: exact match across all candidates", () => 
     if (r.status === "proven") {
       expect(r.bridgeEntry).not.toBeNull();
       expect(r.bridgeEntry?.identity).toBe(bridgeDir);
+    }
+  });
+
+  test("canonical matching succeeds when the Owl install root differs from the target project", () => {
+    // Bridge package lives ONLY under a separate install root; the target
+    // project dir has no packages/ layout at all.
+    const installDir = join(sandbox, "owl-install");
+    const bridgeDir = join(installDir, "packages", "omo-telemetry-bridge");
+    mkdirSync(bridgeDir, { recursive: true });
+    writeFileSync(join(bridgeDir, "package.json"), "{}");
+    expect(existsSync(join(projectDir, "packages"))).toBe(false);
+
+    writeConfig(configDir, "opencode.json", JSON.stringify({ plugin: [bridgeDir] }));
+    const effectiveView: EffectivePluginView = {
+      entries: [
+        {
+          form: "string",
+          effectiveIdentity: `file://${bridgeDir}`,
+          identityKind: "file-url",
+          bridge: {
+            pluginForm: "string",
+            registrationTransport: "env",
+            transportMode: "loopback-http",
+          },
+        },
+      ],
+    };
+
+    const installOpts = {
+      opencodeConfigDir: configDir,
+      projectDirectory: projectDir,
+      owlInstallDirectory: installDir,
+      authorizedRoots: [configDir, projectDir, installDir],
+    };
+    const r = resolveAuthorizedCandidate(installOpts, effectiveView);
+    expect(r.status).toBe("proven");
+    if (r.status === "proven") {
+      expect(r.bridgeEntry).not.toBeNull();
+      expect(r.bridgeEntry?.identity).toBe(bridgeDir);
+      // The proven candidate remains the target project/config source.
+      expect(["opencode-config-dir", "project-root"]).toContain(r.candidate.kind);
     }
   });
 

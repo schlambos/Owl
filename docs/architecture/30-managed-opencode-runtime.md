@@ -89,6 +89,17 @@ The lifecycle mode is selected by the presence of `OPENCODE_BASE_URL` in the ser
 
 The OMO-Slim kill switch `OH_MY_OPENCODE_SLIM_DISABLE` (any value other than empty/`0`/`false`/`no`/`off`) relaxes the OMO-registration readiness requirement: `omoExpected` becomes `false` and the lifecycle does not require OMO agents to be registered.
 
+### Project, config, and install roots (portable contract)
+
+- **Owl install root** — discovered portably from the root `package.json` (`omo-control-plane`) by walking ancestors of the server module (no `../../..` literal, no `process.cwd()` authority). It is distinct from the selected target project.
+- **Target project root** — `OMO_CP_PROJECT_DIR` if set must be an absolute existing directory (validated via `realpath`); otherwise the server's startup cwd. Under the official launchers (`bun run dev` / `dev:server` / `start`) the server is started with cwd = install root, so the default target is the Owl checkout itself. An explicit `OMO_CP_PROJECT_DIR=/path/to/your/project` selects a different project.
+- **OpenCode config root** — `OPENCODE_CONFIG_DIR` if set must be an absolute existing directory; otherwise `$HOME/.config/opencode` (must exist).
+- **Authorized roots** — exactly the realpaths of Owl install root, target project root, and OpenCode config root (deduped). All filesystem reads/writes are gated by this set.
+- **Managed chdir** — in Managed mode the server `process.chdir()`s to the selected target immediately after config load and before any stores, services, lifecycle, or SDK construction, so the SDK (which inherits `process.cwd()`) runs in the target project. Attach mode does not chdir and never owns/stops an external backend.
+- **Telemetry bridge identity** — canonical `packages/omo-telemetry-bridge` path resolves under the Owl install root, not the target project.
+
+Ports remain `8787` (control plane), `5173` (Vite), `4096` (preferred OpenCode). `bun run dev` remains the one-command workflow; `dev:server` / `dev:web` / `start` are unchanged.
+
 ---
 
 ## Ownership
@@ -349,7 +360,7 @@ This is the path that closes the owned SDK OpenCode backend. If the server is SI
 
 `bun run dev` runs `scripts/dev-supervisor.ts`, which:
 
-- Spawns the server (`bun apps/server/src/index.ts` from the repo root, so the server sees the fixed project cwd required by Managed mode) and the web (`bun run dev` in `apps/web`, which runs Vite) as direct child processes with inherited stdio.
+- Spawns the server (`bun apps/server/src/index.ts` from the Owl install root) and the web (`bun run dev` in `apps/web`, which runs Vite) as direct child processes with inherited stdio. The install root is discovered portably via the `omo-control-plane` manifest; the target project is selected via `OMO_CP_PROJECT_DIR` (defaulting to the server's startup cwd, which under this supervisor is the install root checkout) and the server `chdir`s to it in Managed mode before SDK construction.
 - Forwards SIGINT/SIGTERM to both children and waits for them to exit before exiting itself, so the server's `shutdown()` runs and closes the owned SDK backend.
 - If one child exits unexpectedly, stops the survivor and exits non-zero.
 - Does **not** use `bun --watch` for the server. `bun --watch` intercepts SIGINT/SIGTERM and does not exit (it treats them as restart triggers), which prevents the server's graceful shutdown and leaks the owned backend. The server's own `dev:server` script keeps `--watch` for users who want hot restart as a separate command.
@@ -411,7 +422,7 @@ Controlled verification was completed on 2026-08-13 against installed OpenCode `
    - `env -u OPENCODE_BASE_URL bun run dev` started the control plane, frontend, and SDK-owned OpenCode without a manual serve command.
    - Lifecycle reached `mode: managed`, `ownership: control-plane`, `status: connected`, `generation: 1`, `baseUrl: http://127.0.0.1:4096`, version `1.18.16`.
    - Health, config/providers, providers, agents, OMO registration, REST, and SSE readiness were all true.
-   - Runtime used project `/Users/matt/Repos/omo-slim` and config `/Users/matt/.config/opencode`; 78 sessions and authenticated provider/model state loaded.
+   - Runtime used project `<owl-install-root>` (target project — in that run the Owl checkout, because `OMO_CP_PROJECT_DIR` was unset) and config `<opencode-config-dir>` (`$HOME/.config/opencode`); 78 sessions and authenticated provider/model state loaded.
    - Doctor reported OpenCode, OMO, runtime, sessions, and security healthy with zero errors.
 
 2. **Preexisting/external ownership: PASS by automated contract and prior live listener observation**
@@ -427,7 +438,7 @@ Controlled verification was completed on 2026-08-13 against installed OpenCode `
    - A second clean `bun run dev` reached Managed/Control Plane/Connected again, proving normal recovery after shutdown.
 
 5. **Same-runtime TUI: PASS**
-   - `opencode attach http://127.0.0.1:4096 --dir /Users/matt/Repos/omo-slim --mini` opened the installed TUI against the managed URL.
+   - `opencode attach http://127.0.0.1:4096 --dir <target-project> --mini` (in that run `<target-project>` was `<owl-install-root>`) opened the installed TUI against the managed URL.
    - The attached TUI submitted the harmless prompt `Reply exactly: managed-runtime-verification` and displayed the exact response.
    - Control-plane SSE observed `message.updated`, `message.part.delta`, and `session.updated` activity during that interaction.
    - Runtime session count increased 78 → 79 and exposed session `ses_004e6ce74ffeQItf97CGVh4oII`, title `Managed runtime verification`, on generation 1. This proves the TUI and control plane observed the same backend.
@@ -447,8 +458,8 @@ The live run proves managed start, readiness, shared-runtime TUI activity, unexp
 
 - **No PID/process handle.** The installed SDK returns `url + close()` only. The lifecycle cannot signal the OpenCode process directly; it can only call `close()`. There is no PID in the state surface and no process-level supervision.
 - **No success log stream.** The SDK offers no success log API. Only bounded, redacted startup *errors* are surfaced (≤2 000 chars in the adapter, ≤240 chars in state). There is no startup log stream.
-- **No cwd option.** The SDK inherits `process.cwd()`. Managed mode requires the server to run with `cwd = /Users/matt/Repos/omo-slim` (the fixed project directory); the server rejects any other cwd at startup. `OMO_CP_PROJECT_DIR` is no longer a runtime authority.
-- **Single fixed project.** The managed backend and every project-scoped request use one fixed project directory. There is no multi-project support.
+- **Managed cwd inheritance.** The SDK has no cwd option and inherits `process.cwd()`. In Managed mode the server changes cwd to the selected target ( `OMO_CP_PROJECT_DIR` or the startup cwd ) immediately after config load, before lifecycle/SDK construction, so the backend runs in the target project. Attach mode does not chdir.
+- **Target vs install root.** The managed backend and all project-scoped requests use the selected target project root; the Owl install root (where `packages/omo-telemetry-bridge` lives) is distinct and discovered portably from the `omo-control-plane` manifest.
 - **`bun --watch` is signal-unsafe.** It intercepts SIGINT/SIGTERM and does not exit, so the dev supervisor does not use it for the server. Hot restart is available via `dev:server` separately, at the cost of manual signal handling.
 - **External backend loss is terminal.** Attach/external backends are never restarted by the control plane. Loss requires manual Retry.
 - **No provider-discovery remediation.** This slice does not address provider discovery. See [Boundary](#boundary).
@@ -479,7 +490,8 @@ It does not implement automatic TUI launch, provider-discovery remediation, Slic
 
 This project only reads:
 
-1. `/Users/matt/Repos/omo-slim`
-2. Active OpenCode config dir (`/Users/matt/.config/opencode` or `OPENCODE_CONFIG_DIR`)
+1. Owl install root — discovered portably from the root `package.json` (`omo-control-plane`)
+2. Target project root — `OMO_CP_PROJECT_DIR` if set (must be absolute existing directory), otherwise the server's startup cwd (under `bun run dev`/`dev:server`/`start` this is the Owl checkout)
+3. Active OpenCode config root — `OPENCODE_CONFIG_DIR` if set (must be absolute existing directory), otherwise `$HOME/.config/opencode`
 
-Runtime session metadata may reference other paths; those paths are not opened. The managed SDK backend inherits the server process environment and config dir; it does not expand the control plane's authorized read roots.
+Authorized roots are exactly the realpaths of those three directories. Runtime session metadata may reference other paths; those paths are not opened. In Managed mode the server changes cwd to the selected target immediately after config load so the SDK inherits it; Attach mode does not chdir. The managed SDK backend inherits the server process environment and config dir; it does not expand the control plane's authorized read roots. Telemetry bridge package identity (`packages/omo-telemetry-bridge`) resolves under the Owl install root, not the target project.

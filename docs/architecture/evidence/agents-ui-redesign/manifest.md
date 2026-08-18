@@ -5,7 +5,7 @@ Each criterion maps to its proof (test file / browser evidence).
 
 | # | Original exit criterion | Proof |
 |---|---|---|
-| 1 | Relevant locally installed frontend/design skills were actually used | `28-agents-ui-redesign.md` “Skills used” records the explicit `/Users/matt/.agents` authorization, each invoked skill, and the concrete principles applied; the generic bento recommendation and its rejection are recorded. |
+| 1 | Relevant locally installed frontend/design skills were actually used | `28-agents-ui-redesign.md` “Skills used” records the explicit `<home>/.agents` authorization, each invoked skill, and the concrete principles applied; the generic bento recommendation and its rejection are recorded. |
 | 2 | The existing Agents page was reviewed in the running browser before redesign | `before-wide.png` (1440×1000), `before-narrow.png` (1024×768), and the baseline findings in `critique.md`. |
 | 3 | The page information architecture was redesigned, not merely restyled | `AgentsPage.tsx` and `AgentAssignmentRow.tsx`; “exactly five headers” in `agents-assignment-ui.test.tsx`; `before-wide.png` versus `after-wide.png`. |
 | 4 | Agent model assignment is the primary visual concept | Five-column surface places **Assignment** directly after Agent and folds provider/runtime comparison into it; `after-wide.png`; `28-agents-ui-redesign.md` “Design thesis.” |
@@ -26,7 +26,7 @@ Each criterion maps to its proof (test file / browser evidence).
 | 19 | Frontend interaction tests cover aligned/override/drift/problem states | `agents-assignment-ui.test.tsx` covers aligned, Assigned≠Effective, Effective≠Live, both, primary/fallback problems, quiet healthy/never, source, fallback, Edit, custom, disabled, and ownership states. |
 | 20 | Real browser verification is completed | `after-wide.png`, `after-narrow.png`, `after-drawer.png`, `after-editor.png`; live review table in `28-agents-ui-redesign.md`. Real-unavailable divergence/fallback states map to semantic tests below. |
 | 21 | A post-implementation design critique was performed and issues corrected | `critique.md` and `28-agents-ui-redesign.md` “Critique findings and corrections” record issue → correction for assignment classification, project-preset destination, dialogs, source behavior, fallback health, and URL state. |
-| 22 | No filesystem outside authorized roots was inspected | Work remained within `/Users/matt/Repos/omo-slim`, active OpenCode config, and the user-authorized `/Users/matt/.agents` skill root; `changed-files.md` confirms no server/shared/multiplexer/Slice 16 paths were modified. |
+| 22 | No filesystem outside authorized roots was inspected | Work remained within `<owl-install-root>`, active OpenCode config, and the user-authorized `<home>/.agents` skill root; `changed-files.md` confirms no server/shared/multiplexer/Slice 16 paths were modified. |
 
 ## Validation results
 

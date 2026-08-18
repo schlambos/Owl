@@ -121,7 +121,14 @@ const LIMITATIONS: DriftAcceptanceProof["limitations"] = {
 export interface DriftProofDeps {
   store: BridgeRevisionStore;
   opencodeConfigDir: string;
+  /** Target OpenCode/OMO project root (candidate inventory locations). */
   projectDirectory: string;
+  /**
+   * Owl install root. Canonical bridge identity checks resolve against
+   * `<owlInstallDirectory>/packages/omo-telemetry-bridge`, independent of
+   * the target project directory.
+   */
+  owlInstallDirectory: string;
   authorizedRoots: string[];
   overrideActive: boolean;
   /**
@@ -336,7 +343,7 @@ export function computeDriftAcceptanceProof(
   }
   const canonicalCheck = resolveCanonicalBridge(
     canonicalIdentity,
-    deps.projectDirectory,
+    deps.owlInstallDirectory,
     realRoots,
   );
   if (!canonicalCheck.isCanonical) {
@@ -347,7 +354,7 @@ export function computeDriftAcceptanceProof(
     if (i === canonicalIndex) continue;
     const check = resolveCanonicalBridge(
       entries[i]!.identity,
-      deps.projectDirectory,
+      deps.owlInstallDirectory,
       realRoots,
     );
     if (check.isCanonical || check.isBridgeLikeButNotCanonical) {
@@ -385,7 +392,7 @@ export function computeDriftAcceptanceProof(
     for (const entry of candidate.pluginEntries) {
       const check = resolveCanonicalBridge(
         entry.identity,
-        deps.projectDirectory,
+        deps.owlInstallDirectory,
         realRoots,
       );
       if (check.isCanonical || check.isBridgeLikeButNotCanonical) {

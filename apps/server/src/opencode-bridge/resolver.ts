@@ -44,7 +44,14 @@ import { parseBridgeOptions } from "./extractor";
 
 export interface ResolverOptions {
   opencodeConfigDir: string;
+  /** Target OpenCode/OMO project root (candidate sources, project-local state). */
   projectDirectory: string;
+  /**
+   * Owl install root. Canonical bridge identity for source↔effective
+   * equivalence is `<owlInstallDirectory>/packages/omo-telemetry-bridge`,
+   * independent of the target project directory.
+   */
+  owlInstallDirectory: string;
   authorizedRoots: string[];
 }
 
@@ -331,13 +338,14 @@ export function resolveAuthorizedCandidate(
   }
 
   // Compare every candidate against the effective view. Require exactly
-  // one exact match.
+  // one exact match. Canonical bridge equivalence uses the Owl install
+  // root, not the target project directory.
   const matches: SourceCandidate[] = [];
   for (const candidate of candidates) {
     const match = exactSequenceMatch(
       candidate.pluginEntries,
       effectiveView.entries,
-      opts.projectDirectory,
+      opts.owlInstallDirectory,
       opts.authorizedRoots,
     );
     if (match.ok) {
@@ -376,7 +384,7 @@ export function resolveAuthorizedCandidate(
     arePluginEntriesEquivalent(
       { identity: e.identity, identityKind: e.identityKind, form: e.form },
       { identity: effectiveBridge.effectiveIdentity, identityKind: effectiveBridge.identityKind, form: effectiveBridge.form },
-      opts.projectDirectory,
+      opts.owlInstallDirectory,
       opts.authorizedRoots,
     ),
   );
@@ -390,7 +398,7 @@ export function resolveAuthorizedCandidate(
     arePluginEntriesEquivalent(
       { identity: e.identity, identityKind: e.identityKind, form: e.form },
       { identity: effectiveBridge.effectiveIdentity, identityKind: effectiveBridge.identityKind, form: effectiveBridge.form },
-      opts.projectDirectory,
+      opts.owlInstallDirectory,
       opts.authorizedRoots,
     ),
   );
@@ -404,13 +412,13 @@ export function resolveAuthorizedCandidate(
 
 /**
  * Exact ordered sequence match between source and effective plugin entries.
- * Uses canonical bridge equivalence for the managed bridge, and exact lexical
- * match for ordinary plugins.
+ * Uses canonical bridge equivalence (against the Owl install root) for the
+ * managed bridge, and exact lexical match for ordinary plugins.
  */
 function exactSequenceMatch(
   source: SourcePluginEntry[],
   effective: EffectivePluginView["entries"],
-  projectRoot: string,
+  owlInstallRoot: string,
   authorizedRoots: string[],
 ): { ok: true } | { ok: false } {
   if (source.length !== effective.length) return { ok: false };
@@ -422,7 +430,7 @@ function exactSequenceMatch(
       !arePluginEntriesEquivalent(
         { identity: s.identity, identityKind: s.identityKind, form: s.form },
         { identity: e.effectiveIdentity, identityKind: e.identityKind, form: e.form },
-        projectRoot,
+        owlInstallRoot,
         authorizedRoots,
       )
     ) {

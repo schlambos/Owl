@@ -46,11 +46,11 @@ Prefer REST + SSE over CLI scraping. Do not treat static model catalogs as autho
 ### Path
 ```json
 {
-  "home": "/Users/matt",
-  "state": "/Users/matt/.local/state/opencode",
-  "config": "/Users/matt/.config/opencode",
+  "home": "<home>",
+  "state": "<home>/.local/state/opencode",
+  "config": "<opencode-config-dir>",
   "worktree": "/",
-  "directory": "/Users/matt/Repos/omo-slim"
+  "directory": "<owl-install-root>"
 }
 ```
 

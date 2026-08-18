@@ -49,12 +49,12 @@ config, process, or port action was taken to produce them.
 
 ### 1.3 Live global config (read this phase)
 
-- `/Users/matt/.config/opencode/opencode.json` `plugin` array:
+- `<opencode-config-dir>/opencode.json` `plugin` array:
   ```json
   [
     "@ex-machina/opencode-anthropic-auth@1.8.1",
     "oh-my-opencode-slim",
-    "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge"
+    "<owl-install-root>/packages/omo-telemetry-bridge"
   ]
   ```
   The bridge entry is a **bare string**: no tuple, no `port`, no
@@ -64,7 +64,7 @@ config, process, or port action was taken to produce them.
 ### 1.4 OS listener state
 
 - Exactly one listener on `127.0.0.1:8788`, owned by OpenCode **PID 5107**,
-  parented to interactive shell PID 891, cwd `/Users/matt/Repos/omo-slim`.
+  parented to interactive shell PID 891, cwd `<owl-install-root>`.
 - PID 5107 is **not** a child of control-plane PID 15000 / supervisor 14999.
 - `GET /health` → schema v3, bound, pluginInstanceId
   `2be6f6e0-2c2c-4855-9dfd-d4ec82a01581`.
@@ -125,10 +125,10 @@ committed fingerprint `8c23…f43f0`.
 ### 2.3 OpenCode plugin loader semantics — limitation declared
 
 The OpenCode **host loader source is not present under the allowed roots**
-(`/Users/matt/Repos/omo-slim`, `/Users/matt/.config/opencode`). What exists
+(`<owl-install-root>`, `<opencode-config-dir>`). What exists
 locally:
 
-- `/Users/matt/.config/opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts`
+- `<opencode-config-dir>/node_modules/@opencode-ai/plugin/dist/index.d.ts`
   — the plugin API type contract only:
   - lines 48–50: `Config.plugin?: Array<string | [string, PluginOptions]>` —
     one global `plugin` array, bare-string or tuple entries; no per-mode
@@ -136,7 +136,7 @@ locally:
   - lines 52–56: `PluginModule = { id?: string; server: Plugin; tui?: never }`
     — the type system acknowledges server/TUI module discrimination, implying
     both process kinds consume plugin modules from the same list.
-- `/Users/matt/.config/opencode/node_modules/@opencode-ai/sdk/dist/server.{js,d.ts}`
+- `<opencode-config-dir>/node_modules/@opencode-ai/sdk/dist/server.{js,d.ts}`
   — the SDK server **helper** (used to spawn/connect), not the host's plugin
   scan/load implementation.
 

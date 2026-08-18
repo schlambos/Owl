@@ -119,6 +119,9 @@ beforeEach(() => {
   service = new BridgeService({
     opencodeConfigDir: configDir,
     projectDirectory: projectDir,
+    // Fixture install root carries the bridge package under the project
+    // dir (canonicalBridgeDir(projectDir) above stays consistent).
+    owlInstallDirectory: projectDir,
     authorizedRoots: [sandbox],
     revisions: store,
     effectiveViewProvider: async () => {

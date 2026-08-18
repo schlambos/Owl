@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-13  
 **Status:** Factual — citations from installed `oh-my-opencode-slim@2.2.10`  
-**Package:** `oh-my-opencode-slim@2.2.10` (`/Users/matt/.config/opencode/node_modules/oh-my-opencode-slim`)
+**Package:** `oh-my-opencode-slim@2.2.10` (`<opencode-config-dir>/node_modules/oh-my-opencode-slim`)
 
 ## 1. Schema (JSON Schema)
 

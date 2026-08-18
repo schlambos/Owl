@@ -21,7 +21,7 @@ describe("OpenCodeClient canonical request context", () => {
     }) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
+      projectDirectory: "/tmp/owl-fixture/project",
       auth: { username: "operator", password: "secret" },
     });
     await client.agents();
@@ -30,9 +30,9 @@ describe("OpenCodeClient canonical request context", () => {
     }
 
     expect(new URL(requests[0]!.url).searchParams.get("directory"))
-      .toBe("/Users/matt/Repos/omo-slim");
+      .toBe("/tmp/owl-fixture/project");
     expect(new URL(requests[1]!.url).searchParams.get("directory"))
-      .toBe("/Users/matt/Repos/omo-slim");
+      .toBe("/tmp/owl-fixture/project");
     for (const request of requests) {
       expect(request.headers.get("authorization"))
         .toBe(`Basic ${Buffer.from("operator:secret").toString("base64")}`);
@@ -72,7 +72,7 @@ describe("OpenCodeClient.effectivePluginView", () => {
       return new Response(
         JSON.stringify({
           plugin: [
-            "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge",
+            "/tmp/owl-fixture/project/packages/omo-telemetry-bridge",
           ],
         }),
         { status: 200 },
@@ -80,8 +80,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
     }) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
       auth: { username: "operator", password: "secret" },
     });
     const view = await client.effectivePluginView();
@@ -107,8 +107,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
       new Response(JSON.stringify(rawConfig), { status: 200 })) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
     });
     const view = await client.effectivePluginView();
 
@@ -128,8 +128,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
       new Response("Internal Server Error", { status: 500 })) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
     });
     const view = await client.effectivePluginView();
 
@@ -143,8 +143,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
       new Response("not json at all", { status: 200 })) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
     });
     const view = await client.effectivePluginView();
 
@@ -158,8 +158,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
       new Response(JSON.stringify({ agents: {} }), { status: 200 })) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
     });
     const view = await client.effectivePluginView();
 
@@ -173,8 +173,8 @@ describe("OpenCodeClient.effectivePluginView", () => {
       new Response("Unauthorized", { status: 401 })) as unknown as typeof fetch;
 
     const client = new OpenCodeClient("http://opencode.local", {
-      projectDirectory: "/Users/matt/Repos/omo-slim",
-      authorizedRoots: ["/Users/matt/Repos/omo-slim"],
+      projectDirectory: "/tmp/owl-fixture/project",
+      authorizedRoots: ["/tmp/owl-fixture/project"],
       auth: { username: "opencode", password: "server-secret-pw" },
     });
     const view = await client.effectivePluginView();

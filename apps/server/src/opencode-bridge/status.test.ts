@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -40,14 +40,24 @@ let manager: TelemetryBridgeManager;
 
 const fakeProbe = { isInUse: async () => false };
 
-function makeConfig(sandbox: string): ServerConfig {
+function makeConfig(
+  sandbox: string,
+  opts: { owlInstallDirectory?: string } = {},
+): ServerConfig {
+  const projectDirectory = join(sandbox, "project");
+  const opencodeConfigDir = join(sandbox, "config");
+  // Default fixture layout keeps the bridge package under the project
+  // dir, so the fixture "install root" IS the project dir unless
+  // explicitly overridden.
+  const owlInstallDirectory = opts.owlInstallDirectory ?? projectDirectory;
   return {
     host: "127.0.0.1",
     port: 8787,
     opencodeMode: "managed",
-    opencodeConfigDir: join(sandbox, "config"),
-    projectDirectory: join(sandbox, "project"),
-    authorizedRoots: [join(sandbox, "project"), join(sandbox, "config")],
+    opencodeConfigDir,
+    projectDirectory,
+    owlInstallDirectory,
+    authorizedRoots: [projectDirectory, opencodeConfigDir, owlInstallDirectory],
   };
 }
 
@@ -85,6 +95,7 @@ function makeCachedEffective(
     {
       opencodeConfigDir: cfg.opencodeConfigDir,
       projectDirectory: cfg.projectDirectory,
+      owlInstallDirectory: cfg.owlInstallDirectory,
       authorizedRoots: cfg.authorizedRoots,
     },
     view,
@@ -116,6 +127,7 @@ beforeEach(() => {
   service = new BridgeService({
     opencodeConfigDir: configDir,
     projectDirectory: projectDir,
+    owlInstallDirectory: projectDir,
     authorizedRoots: [projectDir, configDir],
     revisions: store,
     probe: fakeProbe,
@@ -250,6 +262,52 @@ describe("composeBridgeStatus", () => {
     });
     expect(status.localPackageAvailable).toBe(false);
     expect(status.lifecycleStatus).toBe("not-installed");
+  });
+
+  test("local package identity follows the Owl install root, not the target project", () => {
+    // Install root carries the bridge package; the target project does not.
+    const installDir = join(sandbox, "owl-install");
+    const installBridgeDir = join(installDir, "packages", "omo-telemetry-bridge");
+    mkdirSync(installBridgeDir, { recursive: true });
+    writeFileSync(join(installBridgeDir, "package.json"), "{}");
+    // Remove the fixture bridge package from the target project dir.
+    try { rmSync(bridgeDir, { recursive: true, force: true }); } catch { /* */ }
+    expect(existsSync(join(projectDir, "packages", "omo-telemetry-bridge"))).toBe(false);
+
+    const installCfg = makeConfig(sandbox, { owlInstallDirectory: installDir });
+    const status = composeBridgeStatus({
+      cfg: installCfg,
+      bridgeStore: store,
+      bridgeService: service,
+      bridgeManager: manager,
+      lifecycleState: makeLifecycleState(),
+      overrideStatus: validateBridgeOverride(undefined),
+      cachedEffectiveState: undefined,
+      cachedReconcile: makeCachedReconcile(),
+    });
+
+    // Bridge identity resolves under the install root...
+    expect(canonicalBridgeDir(installDir)).toBe(realpathSync(installBridgeDir));
+    expect(status.localPackageAvailable).toBe(true);
+
+    // ...while a config whose install root lacks the package reports it
+    // absent even though the project dir exists.
+    const projectCfg = makeConfig(sandbox);
+    expect(canonicalBridgeDir(projectCfg.owlInstallDirectory)).toBe(
+      join(projectDir, "packages", "omo-telemetry-bridge"),
+    );
+    const projectStatus = composeBridgeStatus({
+      cfg: projectCfg,
+      bridgeStore: store,
+      bridgeService: service,
+      bridgeManager: manager,
+      lifecycleState: makeLifecycleState(),
+      overrideStatus: validateBridgeOverride(undefined),
+      cachedEffectiveState: undefined,
+      cachedReconcile: makeCachedReconcile(),
+    });
+    expect(projectStatus.localPackageAvailable).toBe(false);
+    expect(projectStatus.lifecycleStatus).toBe("not-installed");
   });
 
   test("DB unavailable → bridge store/service optional, management routes unavailable", () => {
@@ -764,7 +822,7 @@ describe("fix #14: required proof tests", () => {
 
     // Lifecycle restarts -> generation 2 -> fresh effective view with bridge plugin
     const postRestartLifecycle = makeLifecycleState({ generation: 2 });
-    const canonicalDir = canonicalBridgeDir(projectDir);
+    const canonicalDir = canonicalBridgeDir(cfg.owlInstallDirectory);
     const postRestartView: EffectivePluginView = {
       entries: [
         {
@@ -1061,14 +1119,16 @@ describe("composeBridgeStatus: rebase restore eligibility", () => {
       }),
     } as unknown as TelemetryBridgeManager;
 
-    // Real extraction path through extractEffectivePluginView with raw JSON and projectRoot/authorizedRoots
+    // Real extraction path through extractEffectivePluginView with raw
+    // JSON and the Owl install root/authorizedRoots (fixture default:
+    // install root == project dir, bridge package co-located).
     const rawEffectiveConfig = {
       plugin: [`file://${bridgeDir}`],
     };
     const effectiveView = extractEffectivePluginView(
       rawEffectiveConfig,
       cfg.authorizedRoots,
-      cfg.projectDirectory,
+      cfg.owlInstallDirectory,
     );
     expect(effectiveView.entries).toHaveLength(1);
     expect(effectiveView.entries[0]?.bridge).toBeDefined();

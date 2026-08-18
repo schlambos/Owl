@@ -2,11 +2,35 @@
  * Slice 17 hardened — Extractor tests.
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { extractEffectivePluginView, fingerprintNonce, generateNonce } from "./extractor";
 
-const ROOTS = ["/Users/matt/Repos/omo-slim", "/Users/matt/.config/opencode"];
-const PROJECT_ROOT = "/Users/matt/Repos/omo-slim";
+// Portable fixture: the canonical bridge package lives ONLY under a
+// dedicated Owl install root; the target project root is a separate
+// directory with no packages/ layout.
+let fixtureRoot: string;
+let OWL_INSTALL_DIR: string;
+let BRIDGE_DIR: string;
+let PROJECT_ROOT: string;
+let ROOTS: string[];
+
+beforeAll(() => {
+  fixtureRoot = mkdtempSync(join(tmpdir(), "omo-extractor-"));
+  OWL_INSTALL_DIR = join(fixtureRoot, "owl-install");
+  BRIDGE_DIR = join(OWL_INSTALL_DIR, "packages", "omo-telemetry-bridge");
+  PROJECT_ROOT = join(fixtureRoot, "proj");
+  mkdirSync(BRIDGE_DIR, { recursive: true });
+  writeFileSync(join(BRIDGE_DIR, "package.json"), "{}");
+  mkdirSync(PROJECT_ROOT, { recursive: true });
+  ROOTS = [OWL_INSTALL_DIR, PROJECT_ROOT];
+});
+
+afterAll(() => {
+  try { rmSync(fixtureRoot, { recursive: true, force: true }); } catch { /* */ }
+});
 
 describe("fingerprintNonce", () => {
   test("sha256('abc') = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", () => {
@@ -42,14 +66,14 @@ describe("generateNonce", () => {
 
 describe("extractEffectivePluginView", () => {
   test("absent plugin → empty, not unavailable/invalid", () => {
-    const v = extractEffectivePluginView({ agent: {} }, ROOTS, PROJECT_ROOT);
+    const v = extractEffectivePluginView({ agent: {} }, ROOTS, OWL_INSTALL_DIR);
     expect(v.entries).toEqual([]);
     expect(v.unavailable).toBe(false);
     expect(v.invalid).toBe(false);
   });
 
   test("plugin not array → unavailable + invalid", () => {
-    const v = extractEffectivePluginView({ plugin: "foo" }, ROOTS, PROJECT_ROOT);
+    const v = extractEffectivePluginView({ plugin: "foo" }, ROOTS, OWL_INSTALL_DIR);
     expect(v.unavailable).toBe(true);
     expect(v.invalid).toBe(true);
     expect(v.errors?.[0]?.code).toBe("plugin-shape-unsupported");
@@ -59,7 +83,7 @@ describe("extractEffectivePluginView", () => {
     const v = extractEffectivePluginView(
       { plugin: ["oh-my-opencode-slim"] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries).toHaveLength(1);
     expect(v.entries[0]!.form).toBe("string");
@@ -70,18 +94,18 @@ describe("extractEffectivePluginView", () => {
 
   test("absolute path entry: identityKind=path", () => {
     const v = extractEffectivePluginView(
-      { plugin: ["/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge"] },
+      { plugin: [`${BRIDGE_DIR}`] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries[0]!.identityKind).toBe("path");
   });
 
   test("file:// URL entry: identityKind=file-url", () => {
     const v = extractEffectivePluginView(
-      { plugin: ["file:///Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge"] },
+      { plugin: [`file://${BRIDGE_DIR}`] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries[0]!.identityKind).toBe("file-url");
   });
@@ -94,7 +118,7 @@ describe("extractEffectivePluginView", () => {
         ],
       },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries[0]!.form).toBe("tuple");
     expect(v.entries[0]!.effectiveIdentity).toBe("oh-my-opencode-slim");
@@ -104,7 +128,7 @@ describe("extractEffectivePluginView", () => {
     const v = extractEffectivePluginView(
       { plugin: [{ path: "foo", options: {} }] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.invalid).toBe(true);
     expect(v.errors?.[0]?.code).toBe("plugin-shape-unsupported");
@@ -114,7 +138,7 @@ describe("extractEffectivePluginView", () => {
     const v = extractEffectivePluginView(
       { plugin: ["oh-my-opencode-slim", 42] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.invalid).toBe(true);
   });
@@ -123,7 +147,7 @@ describe("extractEffectivePluginView", () => {
     const v = extractEffectivePluginView(
       { plugin: ["./packages/my-custom-plugin.js"] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.invalid).toBe(false);
     expect(v.entries).toHaveLength(1);
@@ -132,9 +156,9 @@ describe("extractEffectivePluginView", () => {
 
   test("bare string canonical bridge entry → proves presence, env transport, NO port, NO fingerprint", () => {
     const v = extractEffectivePluginView(
-      { plugin: ["/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge"] },
+      { plugin: [`${BRIDGE_DIR}`] },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.invalid).toBe(false);
     expect(v.entries).toHaveLength(1);
@@ -153,7 +177,7 @@ describe("extractEffectivePluginView", () => {
       plugin: ["oh-my-opencode-slim"],
       provider: { openai: { apiKey: "sk-leaked" } },
     };
-    const v = extractEffectivePluginView(rawConfig, ROOTS, PROJECT_ROOT);
+    const v = extractEffectivePluginView(rawConfig, ROOTS, OWL_INSTALL_DIR);
     const serialized = JSON.stringify(v);
     expect(serialized).not.toContain("sk-leaked");
     expect(serialized).not.toContain("provider");
@@ -165,13 +189,13 @@ describe("extractEffectivePluginView", () => {
       {
         plugin: [
           [
-            "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge",
+            `${BRIDGE_DIR}`,
             { port: 8788, activationNonce: rawNonce },
           ],
         ],
       },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries).toHaveLength(1);
     const entry = v.entries[0]!;
@@ -190,13 +214,13 @@ describe("extractEffectivePluginView", () => {
       {
         plugin: [
           [
-            "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge",
+            `${BRIDGE_DIR}`,
             { port: 8788, activationNonce: "too-short" },
           ],
         ],
       },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries[0]?.bridge?.nonceFingerprint).toBeUndefined();
   });
@@ -206,13 +230,13 @@ describe("extractEffectivePluginView", () => {
       {
         plugin: [
           [
-            "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge",
+            `${BRIDGE_DIR}`,
             { port: 9999, activationNonce: "test-activation-nonce-1234567890abcdef" },
           ],
         ],
       },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     expect(v.entries[0]?.bridge?.port).toBeUndefined();
   });
@@ -222,18 +246,52 @@ describe("extractEffectivePluginView", () => {
       {
         plugin: [
           [
-            "/Users/matt/Repos/omo-slim/packages/omo-telemetry-bridge",
+            `${BRIDGE_DIR}`,
             { port: 8788, nonce: "should-be-ignored" },
           ],
         ],
       },
       ROOTS,
-      PROJECT_ROOT,
+      OWL_INSTALL_DIR,
     );
     // 'nonce' is not an allowlisted option; activationNonce is missing.
     // Must NOT fabricate sha256("")!
     expect(v.entries[0]?.bridge?.nonceFingerprint).toBeUndefined();
     expect(v.entries[0]?.bridge?.port).toBe(8788);
     expect(v.entries[0]?.bridge?.pluginForm).toBe("tuple");
+  });
+});
+// ── Install root ≠ project root: canonical identity semantics ──────────
+
+describe("extractEffectivePluginView: Owl install-root identity", () => {
+  test("bridge fingerprint extracted via install root while project root differs", () => {
+    // BRIDGE_DIR lives ONLY under OWL_INSTALL_DIR; PROJECT_ROOT has no
+    // packages/ layout. Identity resolves canonically via the install root.
+    const v = extractEffectivePluginView(
+      { plugin: [`${BRIDGE_DIR}`] },
+      ROOTS,
+      OWL_INSTALL_DIR,
+    );
+    expect(v.invalid).toBe(false);
+    expect(v.entries).toHaveLength(1);
+    expect(v.entries[0]!.bridge).toBeDefined();
+    expect(v.entries[0]!.bridge?.pluginForm).toBe("string");
+    expect(v.entries[0]!.bridge?.registrationTransport).toBe("env");
+    expect(v.entries[0]!.bridge?.transportMode).toBe("loopback-http");
+  });
+
+  test("passing the project root as identity root yields NO fingerprint (root must be the install root)", () => {
+    // Negative proof: the identity root parameter is load-bearing. With
+    // PROJECT_ROOT as the identity root the bridge under the separate
+    // install root is NOT canonical, so no bridge fingerprint is attached.
+    const v = extractEffectivePluginView(
+      { plugin: [`${BRIDGE_DIR}`] },
+      ROOTS,
+      PROJECT_ROOT,
+    );
+    expect(v.invalid).toBe(false);
+    expect(v.entries).toHaveLength(1);
+    expect(v.entries[0]!.identityKind).toBe("path");
+    expect(v.entries[0]!.bridge).toBeUndefined();
   });
 });

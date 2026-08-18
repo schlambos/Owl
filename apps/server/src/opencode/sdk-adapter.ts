@@ -18,8 +18,6 @@
  * Attach/external never uses this path. If launch boundary fails, owned
  * start fails closed with redacted error before spawn.
  */
-const DEFAULT_CONFIG_DIR = "/Users/matt/.config/opencode";
-
 import type { BridgeRevisionStore } from "../opencode-bridge/revisions-bridge";
 import {
   withOwnedBridgeLaunchEnv,
@@ -27,6 +25,38 @@ import {
   type LaunchSecretRedactor,
 } from "../opencode-bridge/launch-boundary";
 import { sanitizeOpenCodeError } from "./security";
+import { statSync } from "node:fs";
+import { isAbsolute } from "node:path";
+
+/**
+ * The owned SDK start resolves the active-config SDK install directly from
+ * the environment. Unlike config.ts, this adapter has no default config
+ * directory: OPENCODE_CONFIG_DIR must be a non-empty, absolute, existing
+ * directory, and a clear error is thrown when it is absent or invalid.
+ */
+function requireValidOpenCodeConfigDir(raw: string | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    throw new Error(
+      "OPENCODE_CONFIG_DIR must be set to a non-empty absolute existing directory for the owned OpenCode SDK start",
+    );
+  }
+  if (!isAbsolute(trimmed)) {
+    throw new Error(
+      `OPENCODE_CONFIG_DIR must be an absolute directory path: ${trimmed}`,
+    );
+  }
+  let stats;
+  try {
+    stats = statSync(trimmed);
+  } catch {
+    throw new Error(`OPENCODE_CONFIG_DIR does not exist: ${trimmed}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(`OPENCODE_CONFIG_DIR is not a directory: ${trimmed}`);
+  }
+  return trimmed;
+}
 
 export interface ManagedSdkHandle {
   url: string;
@@ -146,7 +176,8 @@ export class BridgeLaunchBoundaryError extends Error {
 export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
   // Variable dynamic import intentionally resolves the active-config install,
   // rather than allowing a workspace dependency to drift from OpenCode.
-  const configDir = process.env.OPENCODE_CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
+  // The config dir comes from OPENCODE_CONFIG_DIR only — no default path.
+  const configDir = requireValidOpenCodeConfigDir(process.env.OPENCODE_CONFIG_DIR);
   const modulePath = `${configDir.replace(/\/$/, "")}/node_modules/@opencode-ai/sdk/dist/server.js`;
   const packagePath = `${configDir.replace(/\/$/, "")}/node_modules/@opencode-ai/sdk/package.json`;
   const pkg = (await import(packagePath, { with: { type: "json" } })).default as {

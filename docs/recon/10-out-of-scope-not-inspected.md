@@ -12,7 +12,7 @@ Per project authorization, the following were **not** inspected even if potentia
 - `~/.local/state/opencode` (OpenCode state DB/files)
 - `/tmp`, `/opt`, `/usr/local` (except noting `opencode` binary path via `which` without reading foreign trees)
 - Home-directory-wide searches for OpenCode/OMO projects
-- Session `directory` values pointing at other projects (e.g. `/Users/matt/Repos`, `/Users/matt/Repos/mystatus`) — **metadata only**
+- Session `directory` values pointing at other projects (e.g. `<home>/Repos`, `<home>/Repos/mystatus`) — **metadata only**
 - Project worktrees reported by `GET /project` outside authorized roots
 - npm/bun global caches outside `~/.config/opencode/node_modules`
 - Upstream GitHub repository working trees on disk

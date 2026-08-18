@@ -1,11 +1,11 @@
 /**
  * Slice 17 hardened — Canonical managed bridge identity normalization.
  *
- * The managed telemetry bridge lives at a fixed realpath under the
- * repository's `packages/omo-telemetry-bridge`. Only absolute paths or
- * file:// URLs that resolve to that exact realpath are recognized as the
- * managed bridge. Relative/npm/ambiguous bridge-looking identities block
- * management.
+ * The managed telemetry bridge lives at a fixed realpath under the Owl
+ * install root's `packages/omo-telemetry-bridge` (NOT under the target
+ * OpenCode/OMO project). Only absolute paths or file:// URLs that resolve
+ * to that exact realpath are recognized as the managed bridge.
+ * Relative/npm/ambiguous bridge-looking identities block management.
  *
  * Oracle decision 5: identity kind (npm|path|file-url) is separate from
  * form (string|tuple). Canonical detection by authorized-root realpath,
@@ -18,11 +18,13 @@ import { isAbsolute, resolve as resolvePath } from "node:path";
 import type { BridgeAdvisory, BridgeError, IdentityKind } from "./types";
 
 /**
- * Compute the canonical managed bridge directory realpath from the
- * authorized project root.
+ * Compute the canonical managed bridge directory realpath from the Owl
+ * install root. The bridge package is installed at
+ * `<owlInstallDirectory>/packages/omo-telemetry-bridge`; the target
+ * project directory is irrelevant to bridge package identity.
  */
-export function canonicalBridgeDir(projectRoot: string): string {
-  const joined = resolvePath(projectRoot, "packages", "omo-telemetry-bridge");
+export function canonicalBridgeDir(owlInstallRoot: string): string {
+  const joined = resolvePath(owlInstallRoot, "packages", "omo-telemetry-bridge");
   try {
     if (existsSync(joined)) return realpathSync(joined);
   } catch {
@@ -106,12 +108,12 @@ export interface CanonicalBridgeResult {
 
 export function resolveCanonicalBridge(
   identity: string,
-  projectRoot: string,
+  owlInstallRoot: string,
   authorizedRoots: string[],
 ): CanonicalBridgeResult {
   const advisories: BridgeAdvisory[] = [];
   const errors: BridgeError[] = [];
-  const canonicalDir = canonicalBridgeDir(projectRoot);
+  const canonicalDir = canonicalBridgeDir(owlInstallRoot);
   const isBridgeName =
     identity.includes("omo-telemetry-bridge") ||
     identity.includes("telemetry-bridge") ||
@@ -195,10 +197,10 @@ export function resolveCanonicalBridge(
  */
 export function detectDuplicateBridgeEntries(
   identities: string[],
-  projectRoot: string,
+  owlInstallRoot: string,
   authorizedRoots: string[],
 ): { canonicalCount: number; equivalentIndices: number[] } {
-  const canonicalDir = canonicalBridgeDir(projectRoot);
+  const canonicalDir = canonicalBridgeDir(owlInstallRoot);
   let canonicalReal: string;
   try {
     canonicalReal = existsSync(canonicalDir) ? realpathSync(canonicalDir) : canonicalDir;
@@ -232,14 +234,15 @@ export function detectDuplicateBridgeEntries(
  * 3. FOR THE ONE MANAGED CANONICAL BRIDGE ONLY: source and effective entries
  *    with distinct lexical forms (path ↔ file-url, or reverse) are equivalent
  *    IFF BOTH independently resolve through `resolveCanonicalBridge` to the
- *    exact canonical package realpath under authorized roots/project.
+ *    exact canonical package realpath under the Owl install root and
+ *    authorized roots.
  * 4. Arbitrary non-canonical path/file-url identities do NOT become equivalent.
  * 5. Relative/escaping/malformed/unresolvable identities fail closed (return false).
  */
 export function arePluginEntriesEquivalent(
   entryA: { identity: string; identityKind: IdentityKind; form?: string },
   entryB: { identity: string; identityKind: IdentityKind; form?: string },
-  projectRoot: string,
+  owlInstallRoot: string,
   authorizedRoots: string[],
 ): boolean {
   if (entryA.form !== undefined && entryB.form !== undefined && entryA.form !== entryB.form) {
@@ -253,9 +256,9 @@ export function arePluginEntriesEquivalent(
     (entryA.identityKind === "path" || entryA.identityKind === "file-url") &&
     (entryB.identityKind === "path" || entryB.identityKind === "file-url")
   ) {
-    const resA = resolveCanonicalBridge(entryA.identity, projectRoot, authorizedRoots);
+    const resA = resolveCanonicalBridge(entryA.identity, owlInstallRoot, authorizedRoots);
     if (!resA.isCanonical || resA.realpath === null) return false;
-    const resB = resolveCanonicalBridge(entryB.identity, projectRoot, authorizedRoots);
+    const resB = resolveCanonicalBridge(entryB.identity, owlInstallRoot, authorizedRoots);
     if (!resB.isCanonical || resB.realpath === null) return false;
     return resA.realpath === resB.realpath;
   }

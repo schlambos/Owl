@@ -6,6 +6,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ConfigMutation, ServerConfig } from "./test-types";
 import { applyJsoncPathEdit, hashContent, parseConfigText } from "./jsonc-edit";
@@ -22,7 +23,8 @@ type SC = {
 };
 
 const ROOT = join(import.meta.dir, "../../test/write-sandbox");
-const REAL_CONFIG_DIR = "/Users/matt/.config/opencode";
+const REAL_CONFIG_DIR =
+  process.env.OPENCODE_CONFIG_DIR ?? join(homedir(), ".config", "opencode");
 const REAL_SCHEMA = join(
   REAL_CONFIG_DIR,
   "node_modules",

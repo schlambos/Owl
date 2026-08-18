@@ -58,7 +58,7 @@ function eligibleToRegister(
   return makeBridgeStatus({
     source: {
       present: true,
-      path: "/Users/matt/.config/opencode/opencode.json",
+      path: "/tmp/owl-fixture/opencode/opencode.json",
       format: "json",
       hash: "sha256:source-hash-abc",
       schemaGateMode: "proven",
@@ -108,7 +108,7 @@ function committedAwaitingActivate(
     desired: {
       managed: true,
       enabled: true,
-      targetPath: "/Users/matt/.config/opencode/opencode.json",
+      targetPath: "/tmp/owl-fixture/opencode/opencode.json",
       sourceKind: "opencode-config-dir",
       registrationTransport: "env",
       port: 8788,
@@ -136,7 +136,7 @@ function connectedActive(
   return makeBridgeStatus({
     source: {
       present: true,
-      path: "/Users/matt/.config/opencode/opencode.json",
+      path: "/tmp/owl-fixture/opencode/opencode.json",
       format: "json",
       hash: "sha256:active-hash",
       schemaGateMode: "proven",
@@ -191,7 +191,7 @@ function connectedActive(
     desired: {
       managed: true,
       enabled: true,
-      targetPath: "/Users/matt/.config/opencode/opencode.json",
+      targetPath: "/tmp/owl-fixture/opencode/opencode.json",
       sourceKind: "opencode-config-dir",
       registrationTransport: "tuple",
       port: 8788,
@@ -279,7 +279,7 @@ describe("17 · truthful layering", () => {
     const desired = screen.getByTestId("bridge-desired");
     expect(desired.textContent).toContain("enabled");
     expect(desired.textContent).toContain("Committed");
-    expect(desired.textContent).toContain("/Users/matt/.config/opencode/opencode.json");
+    expect(desired.textContent).toContain("/tmp/owl-fixture/opencode/opencode.json");
     expect(desired.textContent).toContain("rev-bridge-2");
     expect(desired.textContent).toContain("8788");
   });
@@ -374,9 +374,9 @@ describe("17 · long paths wrap safely", () => {
     await openBridgeSection();
     const desired = screen.getByTestId("bridge-desired");
     const pathEl = within(desired).getByText(
-      "/Users/matt/.config/opencode/opencode.json",
+      "/tmp/owl-fixture/opencode/opencode.json",
     );
-    expect(pathEl.textContent).toBe("/Users/matt/.config/opencode/opencode.json");
+    expect(pathEl.textContent).toBe("/tmp/owl-fixture/opencode/opencode.json");
   });
 });
 
@@ -455,7 +455,7 @@ describe("17 · register preview → apply (never restarts)", () => {
             previewId: "preview-1",
             ok: true,
             operation: "add",
-            targetPath: "/Users/matt/.config/opencode/opencode.json",
+            targetPath: "/tmp/owl-fixture/opencode/opencode.json",
             targetFormat: "json",
             diff: '+  "oh-my-opencode-slim": [\n+    "./packages/omo-telemetry-bridge"\n+  ]',
             port: 8788,
@@ -476,7 +476,7 @@ describe("17 · register preview → apply (never restarts)", () => {
             ok: true,
             previewId: "preview-1",
             revisionId: "rev-bridge-3",
-            targetPath: "/Users/matt/.config/opencode/opencode.json",
+            targetPath: "/tmp/owl-fixture/opencode/opencode.json",
             baselineHash: "sha256:source-hash-abc",
             postWriteHash: "sha256:proposed-hash",
             port: 8788,
@@ -502,7 +502,7 @@ describe("17 · register preview → apply (never restarts)", () => {
 
     const preview = screen.getByTestId("bridge-preview");
     expect(preview.getAttribute("aria-live")).toBe("polite");
-    expect(preview.textContent).toContain("/Users/matt/.config/opencode/opencode.json");
+    expect(preview.textContent).toContain("/tmp/owl-fixture/opencode/opencode.json");
     expect(preview.textContent).toContain("sha256:source-hash-abc");
     expect(preview.textContent).toContain("sha256:proposed-hash");
     expect(preview.textContent).toContain("c".repeat(64)); // fingerprint only
@@ -544,7 +544,7 @@ describe("17 · register preview → apply (never restarts)", () => {
             previewId: "preview-2",
             ok: true,
             operation: "add",
-            targetPath: "/Users/matt/.config/opencode/opencode.json",
+            targetPath: "/tmp/owl-fixture/opencode/opencode.json",
             targetFormat: "json",
             diff: "+ bridge",
             baselineHash: "sha256:source-hash-abc",
@@ -674,7 +674,7 @@ describe("17 · separate restart flow", () => {
       desired: {
         managed: true,
         enabled: false,
-        targetPath: "/Users/matt/.config/opencode/opencode.json",
+        targetPath: "/tmp/owl-fixture/opencode/opencode.json",
         sourceKind: "opencode-config-dir",
         sourceHash: "sha256:disabled-hash",
         revisionId: "rev-bridge-4",
@@ -773,7 +773,7 @@ describe("17 · restore flow", () => {
           restore: {
             ok: true,
             revisionId: "rev-bridge-1",
-            targetPath: "/Users/matt/.config/opencode/opencode.json",
+            targetPath: "/tmp/owl-fixture/opencode/opencode.json",
             restoredHash: "sha256:committed-hash-123",
             baselineHash: "sha256:source-hash-abc",
             stateDisposition: "committed",
