@@ -109,6 +109,7 @@ import {
   isDriftRoutePath,
 } from "./opencode-bridge/drift-route";
 import { sanitizeOpenCodeError } from "./opencode/security";
+import { handleReleaseWeb } from "./release-web";
 // ── Slice 17: bridge composition imports ──────────────────────────────
 import {
   BridgeRevisionStore,
@@ -2512,6 +2513,19 @@ const server = Bun.serve({
                   : 400,
           );
         }
+      }
+
+      // ── Release web static handler ────────────────────────────
+      // Serves the built web app from `<install>/web` when present. Mounted
+      // after all drift/OPTIONS/API routes and before the generic JSON 404.
+      // Returns undefined for non-GET/HEAD, `/api` and `/api/*`, or when no
+      // usable web directory exists, preserving the dev JSON 404.
+      {
+        const webResponse = handleReleaseWeb(req, {
+          owlInstallDirectory: cfg.owlInstallDirectory,
+          authorizedRoots: cfg.authorizedRoots,
+        });
+        if (webResponse) return webResponse;
       }
 
       return json({ error: "not found", path: url.pathname }, 404);

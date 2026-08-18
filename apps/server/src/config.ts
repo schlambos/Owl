@@ -50,19 +50,90 @@ export interface ServerConfig {
 }
 
 /**
+ * Production default search start for install-root discovery.
+ *
+ * Forward/backward compatible standalone detection (minimal):
+ * - Explicit `isStandaloneExecutable` override is respected first (test seam).
+ * - Bun >=1.4: `Bun.isStandaloneExecutable === true` is preferred when present
+ *   and indicates a compiled standalone binary.
+ * - Bun 1.3 (pinned 1.3.14): `Bun.isStandaloneExecutable` is undefined, so the
+ *   documented pre-1.4 virtual-path marker is used: normalized `Bun.main`
+ *   beginning with `/$bunfs/` (POSIX) or containing `/~BUN/` after
+ *   normalizing backslashes (Windows `B:\~BUN\`) indicates standalone.
+ *
+ * Standalone start remains `dirname(realpathSync(process.execPath))` with
+ * lexical `dirname(execPath)` fallback for synthetic paths. Source mode
+ * remains `dirname(fileURLToPath(import.meta.url))` and never `process.cwd()`.
+ * The result is fed to the bounded package-name walk in
+ * `resolveOwlInstallDirectory`.
+ *
+ * `overrides` exists only for deterministic unit testing without mutating
+ * global `Bun` state or requiring a compiled binary. `bunMain` is the
+ * injectable equivalent of `Bun.main` so tests do not mutate globals.
+ */
+export function getDefaultOwlInstallSearchStartDir(overrides?: {
+  isStandaloneExecutable?: boolean;
+  bunMain?: string;
+  execPath?: string;
+  moduleDir?: string;
+}): string {
+  let isStandalone: boolean;
+  if (overrides?.isStandaloneExecutable !== undefined) {
+    isStandalone = overrides.isStandaloneExecutable;
+  } else {
+    const bun = (globalThis as unknown as { Bun?: { isStandaloneExecutable?: boolean; main?: string } }).Bun;
+    if (bun?.isStandaloneExecutable === true) {
+      isStandalone = true;
+    } else {
+      const rawMain = overrides?.bunMain ?? bun?.main;
+      if (typeof rawMain === "string") {
+        const normalized = rawMain.replace(/\\/g, "/");
+        isStandalone = normalized.startsWith("/$bunfs/") || normalized.includes("/~BUN/");
+      } else {
+        isStandalone = false;
+      }
+    }
+  }
+
+  if (isStandalone) {
+    const rawExec = overrides?.execPath ?? process.execPath;
+    try {
+      return dirname(realpathSync(rawExec));
+    } catch {
+      // Exec path may be a synthetic test path that does not exist on disk.
+      // Fall back to lexical dirname without realpath.
+      return dirname(rawExec);
+    }
+  }
+
+  if (overrides?.moduleDir !== undefined) return overrides.moduleDir;
+  return dirname(fileURLToPath(import.meta.url));
+}
+
+/**
  * Locate the omo-control-plane install root portably: start at `startDir`
- * (defaults to this module's directory), walk upward at most
- * MAX_INSTALL_ROOT_ANCESTOR_HOPS directories, and return the realpath of
- * the first directory whose `package.json` has name exactly
+ * (defaults to production logic via `getDefaultOwlInstallSearchStartDir()`),
+ * walk upward at most MAX_INSTALL_ROOT_ANCESTOR_HOPS directories, and return
+ * the realpath of the first directory whose `package.json` has name exactly
  * "omo-control-plane". Missing, unreadable, invalid, and non-matching
  * manifests (and non-directory candidates) are skipped. A clear startup
  * error is thrown when no ancestor within the hop limit matches.
  *
  * There is deliberately no `../../..` literal and no process.cwd()
- * authority here: the install root derives from where this module lives.
+ * authority here: the install root derives from where this module lives
+ * (dev) or from the standalone executable's directory (compiled).
+ * `startDir` remains optional so existing tests can pass an explicit
+ * directory without needing a compiled binary; production callers omit it.
+ *
+ * Bun compiled note: in a `bun build --compile` binary `Bun.main` and
+ * `import.meta.url` may be `/$bunfs/root/...` (POSIX) or `B:\~BUN\...`
+ * (Windows) virtual paths pinned on 1.3.14, and `Bun.isStandaloneExecutable`
+ * is only defined from 1.4. The executable-adjacent walk via
+ * `dirname(realpathSync(process.execPath))` is therefore required in
+ * standalone mode.
  */
 export function resolveOwlInstallDirectory(
-  startDir: string = dirname(fileURLToPath(import.meta.url)),
+  startDir: string = getDefaultOwlInstallSearchStartDir(),
 ): string {
   let candidate = startDir;
   for (let hop = 0; hop <= MAX_INSTALL_ROOT_ANCESTOR_HOPS; hop++) {
@@ -121,7 +192,8 @@ function resolveAuthorizedRealDirectory(raw: string, label: string): string {
 export function loadServerConfig(
   env: Record<string, string | undefined> = process.env,
 ): ServerConfig {
-  // Install root derives from this module's location only.
+  // Install root derives from production default start (standalone-aware)
+  // only. Never cwd.
   const owlInstallDirectory = resolveOwlInstallDirectory();
 
   // OMO_CP_PROJECT_DIR is the project-root authority. When unset, the

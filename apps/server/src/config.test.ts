@@ -6,6 +6,7 @@ import {
   realpathSync,
   readFileSync,
   symlinkSync,
+  mkdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -16,6 +17,7 @@ import {
   resolveOwlInstallDirectory,
   validateBridgeOverride,
   assertAuthorizedPath,
+  getDefaultOwlInstallSearchStartDir,
 } from "./config";
 
 function makeTempDir(): string {
@@ -53,6 +55,259 @@ describe("resolveOwlInstallDirectory", () => {
       expect(() => resolveOwlInstallDirectory(tmp)).toThrow("not found");
     } finally {
       cleanup(tmp);
+    }
+  });
+});
+
+// ── getDefaultOwlInstallSearchStartDir source selection (no global Bun mutation) ─
+
+describe("getDefaultOwlInstallSearchStartDir source selection", () => {
+  test("non-standalone returns module directory via injection", () => {
+    const modDir = dirname(fileURLToPath(import.meta.url));
+    expect(
+      getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: false,
+        moduleDir: modDir,
+        execPath: "/fake/exec",
+      }),
+    ).toBe(modDir);
+  });
+
+  test("non-standalone default without overrides returns module directory", () => {
+    // In bun test we are not standalone, so default should equal module dir.
+    const modDir = dirname(fileURLToPath(import.meta.url));
+    expect(getDefaultOwlInstallSearchStartDir()).toBe(modDir);
+  });
+
+  test("standalone returns dirname(realpathSync(execPath)) via injection", () => {
+    const execDir = makeTempDir();
+    const fakeExec = join(execDir, "omo-executable");
+    writeFileSync(fakeExec, "fake binary");
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        execPath: fakeExec,
+      });
+      expect(start).toBe(dirname(realpathSync(fakeExec)));
+      expect(start).toBe(realpathSync(execDir));
+    } finally {
+      cleanup(execDir);
+    }
+  });
+
+  test("standalone resolves symlink execPath via realpath", () => {
+    const targetDir = makeTempDir();
+    const linkParent = makeTempDir();
+    const realExec = join(targetDir, "real-exec");
+    writeFileSync(realExec, "bin");
+    const linkExec = join(linkParent, "link-exec");
+    symlinkSync(realExec, linkExec);
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        execPath: linkExec,
+      });
+      // realpathSync(linkExec) == realExec, dirname is targetDir
+      expect(start).toBe(dirname(realpathSync(realExec)));
+      expect(start).toBe(realpathSync(targetDir));
+    } finally {
+      cleanup(targetDir);
+      cleanup(linkParent);
+    }
+  });
+
+  test("standalone with nonexistent execPath falls back to lexical dirname", () => {
+    const fake = join(tmpdir(), `omo-nonexistent-${Date.now()}`, "bin", "exec");
+    const start = getDefaultOwlInstallSearchStartDir({
+      isStandaloneExecutable: true,
+      execPath: fake,
+    });
+    expect(start).toBe(dirname(fake));
+  });
+
+  test("does not use process.cwd() - cwd change does not affect injected moduleDir", () => {
+    const modDir = dirname(fileURLToPath(import.meta.url));
+    const cwdTemp = makeTempDir();
+    const prev = process.cwd();
+    try {
+      process.chdir(cwdTemp);
+      expect(
+        getDefaultOwlInstallSearchStartDir({
+          isStandaloneExecutable: false,
+          moduleDir: modDir,
+        }),
+      ).toBe(modDir);
+      expect(getDefaultOwlInstallSearchStartDir({ isStandaloneExecutable: false, moduleDir: modDir })).not.toBe(
+        realpathSync(cwdTemp),
+      );
+    } finally {
+      process.chdir(prev);
+      cleanup(cwdTemp);
+    }
+  });
+});
+
+// ── Bun 1.3/1.4 forward/backward compatible detection via injectable Bun.main ─
+
+describe("getDefaultOwlInstallSearchStartDir Bun detection compatibility", () => {
+  test("1.3 POSIX marker /$bunfs/ is treated as standalone via bunMain", () => {
+    const execDir = makeTempDir();
+    const fakeExec = join(execDir, "omo-bin");
+    writeFileSync(fakeExec, "fake");
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        bunMain: "/$bunfs/root/apps/server/src/index.ts",
+        execPath: fakeExec,
+      });
+      expect(start).toBe(dirname(realpathSync(fakeExec)));
+      expect(start).toBe(realpathSync(execDir));
+    } finally {
+      cleanup(execDir);
+    }
+  });
+
+  test("Windows marker B:\\~BUN\\ normalized to /~BUN/ is treated as standalone", () => {
+    const execDir = makeTempDir();
+    const fakeExec = join(execDir, "omo-bin.exe");
+    writeFileSync(fakeExec, "fake");
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        bunMain: "B:\\~BUN\\some\\path\\index.js",
+        execPath: fakeExec,
+      });
+      expect(start).toBe(dirname(realpathSync(fakeExec)));
+      // Also verify normalization with mixed separators and drive prefix
+      const start2 = getDefaultOwlInstallSearchStartDir({
+        bunMain: "B:\\~BUN\\apps\\server\\index.ts",
+        execPath: fakeExec,
+      });
+      expect(start2).toBe(dirname(realpathSync(fakeExec)));
+    } finally {
+      cleanup(execDir);
+    }
+  });
+
+  test("1.4 boolean flag isStandaloneExecutable true is treated as standalone even with normal Bun.main", () => {
+    const execDir = makeTempDir();
+    const fakeExec = join(execDir, "omo-bin-1.4");
+    writeFileSync(fakeExec, "fake");
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        bunMain: "/app/repo/apps/server/src/index.ts",
+        execPath: fakeExec,
+      });
+      expect(start).toBe(dirname(realpathSync(fakeExec)));
+    } finally {
+      cleanup(execDir);
+    }
+  });
+
+  test("explicit false override takes precedence over virtual Bun.main marker", () => {
+    const modDir = dirname(fileURLToPath(import.meta.url));
+    const execDir = makeTempDir();
+    const fakeExec = join(execDir, "omo-bin-override");
+    writeFileSync(fakeExec, "fake");
+    try {
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: false,
+        bunMain: "/$bunfs/root/apps/server/src/index.ts",
+        execPath: fakeExec,
+        moduleDir: modDir,
+      });
+      expect(start).toBe(modDir);
+      // Also Windows marker with explicit false should not be standalone
+      const startWin = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: false,
+        bunMain: "B:\\~BUN\\path\\index.js",
+        execPath: fakeExec,
+        moduleDir: modDir,
+      });
+      expect(startWin).toBe(modDir);
+    } finally {
+      cleanup(execDir);
+    }
+  });
+
+  test("normal source Bun.main path is not standalone", () => {
+    const modDir = dirname(fileURLToPath(import.meta.url));
+    expect(
+      getDefaultOwlInstallSearchStartDir({
+        bunMain: "/app/repo/apps/server/src/index.ts",
+        moduleDir: modDir,
+        execPath: "/fake/should-not-be-used",
+      }),
+    ).toBe(modDir);
+
+    expect(
+      getDefaultOwlInstallSearchStartDir({
+        bunMain: "/home/user/project/apps/server/src/config.ts",
+        moduleDir: modDir,
+      }),
+    ).toBe(modDir);
+  });
+});
+
+// ── simulated standalone executable-adjacent package root ───────────────
+
+describe("resolveOwlInstallDirectory simulated standalone executable adjacency", () => {
+  test("exec adjacent to package root is found via bounded walk", () => {
+    const installRoot = makeTempDir();
+    try {
+      writeFileSync(join(installRoot, "package.json"), JSON.stringify({ name: "omo-control-plane" }));
+      const fakeExec = join(installRoot, "omo-control-plane-bin");
+      writeFileSync(fakeExec, "fake");
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        execPath: fakeExec,
+      });
+      expect(start).toBe(realpathSync(installRoot));
+      expect(resolveOwlInstallDirectory(start)).toBe(realpathSync(installRoot));
+    } finally {
+      cleanup(installRoot);
+    }
+  });
+
+  test("exec in nested subdir walks up to install root", () => {
+    const installRoot = makeTempDir();
+    try {
+      writeFileSync(join(installRoot, "package.json"), JSON.stringify({ name: "omo-control-plane" }));
+      const nested = join(installRoot, "dist", "bin");
+      mkdirSync(nested, { recursive: true });
+      const fakeExec = join(nested, "server");
+      writeFileSync(fakeExec, "fake");
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        execPath: fakeExec,
+      });
+      expect(start).toBe(realpathSync(nested));
+      expect(resolveOwlInstallDirectory(start)).toBe(realpathSync(installRoot));
+    } finally {
+      cleanup(installRoot);
+    }
+  });
+
+  test("exec adjacent via explicit startDir never uses cwd", () => {
+    const installRoot = makeTempDir();
+    const cwdTemp = makeTempDir();
+    const prev = process.cwd();
+    try {
+      writeFileSync(join(installRoot, "package.json"), JSON.stringify({ name: "omo-control-plane" }));
+      const fakeExec = join(installRoot, "bin-exec");
+      writeFileSync(fakeExec, "fake");
+      const start = getDefaultOwlInstallSearchStartDir({
+        isStandaloneExecutable: true,
+        execPath: fakeExec,
+      });
+      process.chdir(cwdTemp);
+      // Even after chdir, explicit start still resolves to installRoot
+      expect(resolveOwlInstallDirectory(start)).toBe(realpathSync(installRoot));
+      // And chdir'd cwd is not considered
+      expect(start).not.toBe(realpathSync(cwdTemp));
+    } finally {
+      process.chdir(prev);
+      cleanup(installRoot);
+      cleanup(cwdTemp);
     }
   });
 });

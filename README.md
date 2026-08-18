@@ -140,6 +140,27 @@ bun run dev
 
 Both paths must already exist and must be absolute. Owl fails closed on blank, relative, missing, or non-directory roots.
 
+## Prebuilt binaries
+
+Trigger **Build release artifacts** manually from the **Actions** tab and download the artifact for your platform (`owl-windows-x64`, `owl-darwin-arm64`, `owl-linux-x64`). Extract the archive and preserve the directory structure — the binary expects its sibling assets alongside it.
+
+Prebuilt binaries still require an existing OpenCode config directory with Oh My OpenCode Slim installed and `@opencode-ai/sdk@1.18.14` available under that config directory's `node_modules`.
+
+```bash
+# Run with defaults (project = current directory, config = ~/.config/opencode)
+./owl            # or owl.exe on Windows
+
+# Explicit project / config
+OMO_CP_PROJECT_DIR=/absolute/path/to/your_project ./owl
+OPENCODE_CONFIG_DIR=/absolute/path/to/opencode-config OMO_CP_PROJECT_DIR=/absolute/path/to/your_project ./owl
+```
+
+Open `http://127.0.0.1:8787` for the UI.
+
+Notes:
+- macOS build is unsigned — allow it via **System Settings → Privacy & Security** or right-click → Open, and clear Gatekeeper with `xattr -d com.apple.quarantine ./owl` if needed.
+- Linux build is Ubuntu 22.04-built, glibc 2.35+ x64 baseline, not every Debian.
+
 ## Managed and Attach modes
 
 Owl has two explicit OpenCode lifecycle modes.
