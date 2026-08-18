@@ -125,7 +125,9 @@ describe("schema validation in the edit preview", () => {
 
     // Apply stays disabled despite an otherwise-ok simulation.
     expect(
-      (screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement)
+      (screen.getByRole("button", {
+        name: "Apply Assignment",
+      }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
   });
@@ -140,7 +142,9 @@ describe("schema validation in the edit preview", () => {
 
     await poll(() =>
       expect(
-        (screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement)
+        (screen.getByRole("button", {
+          name: "Apply Assignment",
+        }) as HTMLButtonElement)
           .disabled,
       ).toBe(false),
     );

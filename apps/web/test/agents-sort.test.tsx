@@ -12,7 +12,7 @@
  * including Provider and Issues First, grouped default and flat modes,
  * the missing-last invariant, and aria-sort.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -48,6 +48,10 @@ function renderWithModels(ui: ReactNode) {
 }
 
 const isoAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+});
 
 function desiredAgent(model: string | undefined): DesiredAgent {
   return { name: "explorer", kind: "builtin", model, sourceIds: ["fixture"] };
@@ -475,7 +479,7 @@ describe("agents sort — signals severity", () => {
 });
 
 describe("agents sort — visible Sort control (Provider / Issues First)", () => {
-  test("control lists Default / Agent Name / Provider / Model / Source / Issues First", async () => {
+  test("control lists Default / Agent Name / Provider / Model / Source / Issues First / Kind", async () => {
     const rows = [
       makeRow({
         name: "explorer",
@@ -505,6 +509,7 @@ describe("agents sort — visible Sort control (Provider / Issues First)", () =>
       "Model",
       "Source",
       "Issues First",
+      "Kind",
     ]);
     // Default → no direction flip button.
     expect(
@@ -750,8 +755,8 @@ describe("agents sort — missing values last", () => {
         effectiveModel: "ollama-cloud/deepseek-v4-flash:0731",
         modelSourceStage: "preset",
       }),
-      // Council built-in with no effective model.
-      makeRow({ name: "council", kind: "builtin", liveModel: "xai/grok-4.5" }),
+      // Eligible custom agent with no effective model (missing model value).
+      makeRow({ name: "ghost", kind: "custom" }),
     ];
     const dto = makeDtoWithDesired({
       preset: "openai",
@@ -768,11 +773,11 @@ describe("agents sort — missing values last", () => {
     const modelBtn = screen.getByRole("button", { name: /Sort by model/i });
     fireEvent.click(modelBtn);
     await poll(() => screen.getByRole("button", { name: /sorted ascending/i }));
-    expect(rowNames()).toEqual(["explorer", "council"]);
+    expect(rowNames()).toEqual(["explorer", "ghost"]);
 
     fireEvent.click(modelBtn);
     await poll(() => screen.getByRole("button", { name: /sorted descending/i }));
-    expect(rowNames()).toEqual(["explorer", "council"]);
+    expect(rowNames()).toEqual(["explorer", "ghost"]);
   });
 });
 

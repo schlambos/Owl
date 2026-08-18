@@ -375,18 +375,12 @@ function SourceDisclosure(props: {
         }
         aria-expanded={open}
         aria-controls={sourceDetailId}
-        aria-label={
-          suppressed
-            ? `${row.sourceLabel} (group default). Toggle provenance path.`
-            : `${row.sourceLabel}. Toggle provenance path.`
-        }
+        aria-label={`${row.sourceLabel}. Toggle provenance path.`}
       >
         {suppressed ? (
-          /* Quiet "more" affordance — the group header states the shared
-           * source; the accessible name above carries the real label. */
-          <span className="source-more" aria-hidden="true">
-            ⋯
-          </span>
+          /* Quiet collapse — the group header states the shared source; the
+           * accessible name above still carries the row's real label. */
+          <span className="source-more">Same as group</span>
         ) : (
           row.sourceLabel
         )}

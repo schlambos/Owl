@@ -13,7 +13,7 @@
  * params never persist and are cleared by control changes; unknown params
  * preserved; migrations filter=disabled → disabled=1 and native=1 removal.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import {
   createMemoryRouter,
@@ -76,6 +76,8 @@ function worldRows(): AgentsDto {
     openai: {
       explorer: desiredAgent("ollama-cloud/deepseek-v4-flash:0731"),
       fixer: desiredAgent("ollama-cloud/kimi-k3"),
+      // critic is assigned in the preset but a root override wins → override.
+      critic: desiredAgent("openai/gpt-5.6"),
     },
   };
   dto.desired.agents = { critic: desiredAgent("xai/grok-4.5") };
@@ -83,7 +85,6 @@ function worldRows(): AgentsDto {
 }
 
 function setup(initial: string): { router: Router } {
-  window.sessionStorage.clear();
   mockFetch(
     baseRoutes({ agents: worldRows(), providers: makeProvidersDto([]) }),
   );
@@ -112,6 +113,10 @@ function setup(initial: string): { router: Router } {
 function loc(): string {
   return screen.getByTestId("loc").textContent ?? "";
 }
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+});
 
 describe("agents URL state — hydration", () => {
   test("filter/q/sort/disabled hydrate from the URL", async () => {

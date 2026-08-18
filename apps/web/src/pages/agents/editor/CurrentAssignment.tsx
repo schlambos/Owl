@@ -193,17 +193,20 @@ export function CurrentAssignment(props: {
           model and its source. */}
       {!compact ? (
         <dl className="row-kv ame-current-meta" aria-label="Assignment layers">
-          <dt>Assigned</dt>
+          {/* "…model" suffixes keep the raw-value list unambiguous with the
+              Configured/Effective/Live layer labels above (single accessible
+              occurrence of each bare layer name). */}
+          <dt>Assigned model</dt>
           <dd title={assigned?.sourcePath ?? ""}>
             {assigned?.model ?? "—"}
             {assigned?.variant ? ` (${assigned.variant})` : ""}
           </dd>
-          <dt>Effective</dt>
+          <dt>Effective model</dt>
           <dd>
             {row.effectiveModel ?? "—"}
             {row.effectiveVariant ? ` (${row.effectiveVariant})` : ""}
           </dd>
-          <dt>Live</dt>
+          <dt>Live model</dt>
           <dd>
             {row.liveModel ?? "—"}
             {row.liveVariant ? ` (${row.liveVariant})` : ""}

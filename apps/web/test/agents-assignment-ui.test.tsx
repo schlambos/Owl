@@ -17,7 +17,7 @@
  * (renamed from "Edit" during parallel polish); ENTRY_ACTION accepts the
  * transition label but tests never assert old-Edit-only semantics.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { fireEvent, screen, within } from "@testing-library/react";
 import type { AgentsDto, DesiredAgent } from "@omo/shared";
 import { AgentsPage } from "../src/pages/AgentsPage";
@@ -54,6 +54,10 @@ function renderWithModels(ui: ReactNode, initialEntries: string[] = ["/agents"])
 }
 
 const isoAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+});
 
 /**
  * Row entry action into the model editor. Final intended label is
@@ -545,18 +549,25 @@ describe("agents assignment IA — status (fallbacks + model health)", () => {
     // Running primary: quiet "Testing", and NOT counted as a model issue.
     const oracleStatus = findRowByName("oracle").querySelectorAll("td")[2]!;
     expect(oracleStatus.textContent).toContain("Testing");
-    const issuesChip = screen.getByRole("radio", { name: /Model Issues, 0/ });
+    const issuesChip = screen.getByRole("radio", { name: /Model issues, 0/ });
     expect(issuesChip).toBeTruthy();
   });
 });
 
 describe("agents assignment IA — ownership", () => {
-  test("disabled Observer is an ordinary editable row (entry action + Caps) in the Disabled group", async () => {
+  test("disabled Observer is hidden by default and shown only via Show disabled", async () => {
     const rows = [makeRow({ name: "observer", kind: "builtin", enabled: false })];
     const dto = makeAgentsDtoWithDesired({ preset: "openai", rows });
 
     mockFetch(baseRoutes({ agents: dto, providers: makeProvidersDto([]) }));
     renderWithRouter(<AgentsPage />);
+    await poll(() => screen.getByText("Team"));
+
+    // Disabled agents are excluded by default (doc 34 Show disabled OFF).
+    expect(screen.queryByText("observer")).toBeNull();
+
+    // Reveal via the Show disabled gate.
+    fireEvent.click(screen.getByRole("checkbox", { name: /Show disabled/ }));
     await poll(() => screen.getByText("observer"));
 
     const row = findRowByName("observer");
@@ -564,11 +575,10 @@ describe("agents assignment IA — ownership", () => {
     within(row).getByText("Unconfigured");
     within(row).getByRole("button", { name: ENTRY_ACTION });
     within(row).getByRole("button", { name: /Edit capabilities for observer/ });
-    // Grouped by state, not kind: the disabled builtin lands in the
-    // Disabled group and the Built-in Team group is omitted entirely.
-    const groups = groupHeaders();
-    expect(groups.map((g) => g.id)).toEqual(["disabled"]);
-    expect(groups[0]!.text).toContain("Disabled");
+    // The disabled builtin is an ordinary editable row once revealed.
+    expect(screen.getByTestId("agents-disabled-shown").textContent).toContain(
+      "disabled shown: 1",
+    );
   });
 
   test("council WITH a normal effective assignment is editable", async () => {
@@ -591,10 +601,12 @@ describe("agents assignment IA — ownership", () => {
 
     const row = findRowByName("council");
     within(row).getByRole("button", { name: ENTRY_ACTION });
-    expect(within(row).queryByRole("link")).toBeNull();
+    // Editable: no "Managed in Council" owner link (the model cell's
+    // cross-nav link to /models is expected and unrelated to ownership).
+    expect(within(row).queryByRole("link", { name: "Managed in Council" })).toBeNull();
   });
 
-  test("council live-only and councillor link to /council", async () => {
+  test("council live-only and councillor are excluded from the roster", async () => {
     const rows = [
       makeRow({ name: "council", kind: "builtin", liveModel: "xai/grok-4.5" }),
       makeRow({
@@ -602,25 +614,32 @@ describe("agents assignment IA — ownership", () => {
         kind: "builtin",
         liveModel: "xai/grok-4.5",
       }),
+      makeRow({
+        name: "explorer",
+        kind: "builtin",
+        effectiveModel: "ollama-cloud/deepseek-v4-flash:0731",
+        modelSourceStage: "preset",
+      }),
     ];
-    const dto = makeAgentsDtoWithDesired({ preset: "openai", rows });
+    const dto = makeAgentsDtoWithDesired({
+      preset: "openai",
+      presetAgents: {
+        explorer: desiredAgent("ollama-cloud/deepseek-v4-flash:0731"),
+      },
+      rows,
+    });
     mockFetch(baseRoutes({ agents: dto, providers: makeProvidersDto([]) }));
     renderWithRouter(<AgentsPage />);
-    await poll(() => screen.getByText("council"));
+    await poll(() => screen.getByText("explorer"));
 
-    for (const name of ["council", "councillor"]) {
-      const row = findRowByName(name);
-      within(row).getByText("No assignment (live only)");
-      expect(within(row).queryByText("Runtime drift")).toBeNull();
-      expect(
-        within(row).queryByRole("button", { name: ENTRY_ACTION }),
-      ).toBeNull();
-      const link = within(row).getByRole("link", { name: "Managed in Council" });
-      expect(link.getAttribute("href")).toBe("/council");
-    }
+    // Live-only council and councillor are excluded by eligibility (doc 34);
+    // they are represented only as a dependency link to /council, never as
+    // roster rows.
+    expect(screen.queryByText("council")).toBeNull();
+    expect(screen.queryByText("councillor")).toBeNull();
   });
 
-  test("ACP wrapper links to /acp; native links to /config with explanation", async () => {
+  test("ACP wrapper and native agents are excluded from the roster", async () => {
     const rows = [
       makeRow({
         name: "wrapper-bot",
@@ -632,6 +651,12 @@ describe("agents assignment IA — ownership", () => {
         kind: "native",
         liveModel: "anthropic/claude-sonnet-4-5",
       }),
+      makeRow({
+        name: "explorer",
+        kind: "builtin",
+        effectiveModel: "ollama-cloud/deepseek-v4-flash:0731",
+        modelSourceStage: "preset",
+      }),
     ];
     mockFetch(
       baseRoutes({
@@ -641,34 +666,13 @@ describe("agents assignment IA — ownership", () => {
       }),
     );
     renderWithRouter(<AgentsPage />);
-    await poll(() => screen.getByText("wrapper-bot"));
+    await poll(() => screen.getByText("explorer"));
 
-    const acpRow = findRowByName("wrapper-bot");
-    expect(
-      within(acpRow).queryByRole("button", { name: ENTRY_ACTION }),
-    ).toBeNull();
-    const acpLink = within(acpRow).getByRole("link", {
-      name: "Managed in ACP",
-    });
-    expect(acpLink.getAttribute("href")).toBe("/acp");
-
-    // Native rows hidden by default — reveal them.
-    fireEvent.click(
-      screen.getByRole("checkbox", { name: /Show native OpenCode agents/ }),
-    );
-    await poll(() => screen.getByText("build"));
-    const nativeRow = findRowByName("build");
-    within(nativeRow).getByText("Native");
-    expect(
-      within(nativeRow).queryByRole("button", { name: ENTRY_ACTION }),
-    ).toBeNull();
-    const configLink = within(nativeRow).getByRole("link", {
-      name: "Managed by OpenCode configuration",
-    });
-    expect(configLink.getAttribute("href")).toBe("/config");
-    // Native rows group together once revealed.
-    const nativeGroup = groupHeaders().find((g) => g.id === "native");
-    expect(nativeGroup?.text).toContain("Native");
+    // ACP wrappers and native agents are excluded by eligibility (doc 34);
+    // they are represented only as dependency links to /acp and /config,
+    // never as roster rows.
+    expect(screen.queryByText("wrapper-bot")).toBeNull();
+    expect(screen.queryByText("build")).toBeNull();
   });
 
   test("custom agent shows Custom pill + entry action", async () => {
@@ -1011,7 +1015,7 @@ describe("agents assignment IA — detail drawer & editor transitions", () => {
       screen.getByRole("heading", { name: /Change model — explorer/ }),
     );
     const dialog = screen.getByRole("dialog");
-    const assignedDt = within(dialog).getByText("Assigned");
+    const assignedDt = within(dialog).getByText("Assigned model");
     const assignedDd = assignedDt.nextElementSibling;
     expect(assignedDd?.textContent).toContain(
       "ollama-cloud/deepseek-v4-flash:0731",
@@ -1021,7 +1025,7 @@ describe("agents assignment IA — detail drawer & editor transitions", () => {
 });
 
 describe("agents assignment IA — filters & search", () => {
-  test("filter Overrides narrows to root-agent / project / user-config", async () => {
+  test("filter Overrides narrows to Assigned ≠ Effective rows", async () => {
     const rows = [
       makeRow({
         name: "explorer",
@@ -1029,12 +1033,15 @@ describe("agents assignment IA — filters & search", () => {
         effectiveModel: "ollama-cloud/deepseek-v4-flash:0731",
         modelSourceStage: "preset",
       }),
+      // critic: preset assigns gpt-5.6, but a root override wins (grok-4.5)
+      // → Assigned ≠ Effective → override.
       makeRow({
         name: "critic",
         kind: "custom",
         effectiveModel: "xai/grok-4.5",
         modelSourceStage: "root-agent",
       }),
+      // fixer-high: preset assigns kimi-k3, root override wins (gpt-5.6-sol).
       makeRow({
         name: "fixer-high",
         kind: "custom",
@@ -1046,6 +1053,8 @@ describe("agents assignment IA — filters & search", () => {
       preset: "openai",
       presetAgents: {
         explorer: desiredAgent("ollama-cloud/deepseek-v4-flash:0731"),
+        critic: desiredAgent("openai/gpt-5.6"),
+        "fixer-high": desiredAgent("ollama-cloud/kimi-k3"),
       },
       rootAgents: {
         critic: desiredAgent("xai/grok-4.5"),
@@ -1096,7 +1105,7 @@ describe("agents assignment IA — filters & search", () => {
     renderWithRouter(<AgentsPage />);
     await poll(() => screen.getByText("explorer"));
 
-    fireEvent.click(screen.getByRole("radio", { name: /Runtime Drift/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Runtime drift/ }));
     await poll(() => {
       expect(screen.queryByText("explorer")).toBeNull();
       screen.getByText("fixer");
@@ -1179,7 +1188,7 @@ describe("agents assignment IA — filters & search", () => {
     renderWithModels(<AgentsPage />);
     await poll(() => screen.getByText("explorer"));
 
-    fireEvent.click(screen.getByRole("radio", { name: /Model Issues/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Model issues/ }));
     await poll(() => {
       expect(screen.queryByText("explorer")).toBeNull();
       screen.getByText("fixer");
@@ -1460,13 +1469,13 @@ describe("agents assignment IA — grouped default order & summary", () => {
       screen.getByRole("radio", { name: /^All, 2$/ }).getAttribute("aria-checked"),
     ).toBe("true");
     expect(
-      screen.getByRole("radio", { name: /Overrides, 1/ }),
+      screen.getByRole("radio", { name: /Overrides, 0/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("radio", { name: /Runtime Drift, 1/ }),
+      screen.getByRole("radio", { name: /Runtime drift, 1/ }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("radio", { name: /Model Issues, 0/ }),
+      screen.getByRole("radio", { name: /Model issues, 0/ }),
     ).toBeTruthy();
     // The polite live region announces scope + grouped default order.
     const live = document.querySelector(

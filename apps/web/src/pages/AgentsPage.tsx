@@ -42,14 +42,36 @@ import {
   applyTeamAgentsView,
   TEAM_AGENT_FILTER_IDS,
   TEAM_AGENT_FILTER_LABELS,
-  TEAM_AGENT_SORT_IDS,
-  TEAM_AGENT_SORT_LABELS,
   type TeamAgentFilterId,
   type TeamAgentSortId,
   type TeamSort,
 } from "./team/topology";
 import "../styles/agents.css";
 import "../styles/team-roster.css";
+
+/**
+ * Visible Sort-control vocabulary (doc 34 `sort` ids, roster wording):
+ * Default (team order) + the four column sorts in their on-screen order,
+ * then the two comparison-only modes — Provider (no dedicated column) and
+ * Issues First (signals severity) — and Kind.
+ */
+const AGENT_SORT_OPTION_IDS: readonly TeamAgentSortId[] = [
+  "name",
+  "provider",
+  "model",
+  "source",
+  "signals",
+  "kind",
+];
+
+const AGENT_SORT_OPTION_LABELS: Record<TeamAgentSortId, string> = {
+  name: "Agent Name",
+  model: "Model",
+  provider: "Provider",
+  source: "Source",
+  signals: "Issues First",
+  kind: "Kind",
+};
 
 /** Find a row trigger button by data attribute (focus-return targets). */
 function findTrigger(
@@ -228,8 +250,8 @@ export function AgentsPage() {
         <TeamSortControl<TeamAgentSortId>
           sort={controls.sort as TeamSort<TeamAgentSortId> | null}
           defaultSort={null}
-          ids={TEAM_AGENT_SORT_IDS}
-          labels={TEAM_AGENT_SORT_LABELS}
+          ids={AGENT_SORT_OPTION_IDS}
+          labels={AGENT_SORT_OPTION_LABELS}
           onChange={(s) => commit({ sort: s })}
         />
         <label className="agents-native-toggle team-show-disabled">
