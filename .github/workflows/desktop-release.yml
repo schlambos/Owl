@@ -65,6 +65,13 @@ jobs:
             bundles: "deb,appimage"
             artifact: owl-desktop-linux-x64
     runs-on: ${{ matrix.runner }}
+    env:
+      # linuxdeploy (AppImage) needs FUSE, which GitHub-hosted Ubuntu runners
+      # lack; extract-and-run makes the AppImage runtime self-extract instead.
+      # NO_STRIP skips linuxdeploy's strip step, which can fail on the
+      # Bun-compiled sidecar (not a standard ELF). Both are inert on macOS/Windows.
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+      NO_STRIP: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -76,7 +83,19 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libfuse2 \
+            libglib2.0-bin \
+            libgdk-pixbuf2.0-bin \
+            libgtk-3-bin \
+            desktop-file-utils \
+            shared-mime-info \
+            squashfs-tools \
+            xdg-utils
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -84,14 +103,43 @@ jobs:
         run: bun run scripts/prepare-desktop-assets.ts --target ${{ matrix.target }}
       - name: Smoke sidecar (desktop mode)
         run: bun run scripts/smoke-sidecar.ts
+      - name: Wrap ldd for static Bun sidecar
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # linuxdeploy-plugin-gtk runs `ldd` on the bundled externalBin. The
+          # Bun-compiled sidecar is a musl-static binary, so ldd reports "not a
+          # dynamic executable" and the plugin aborts. Wrap /usr/bin/ldd so that
+          # only the staged sidecar basename `owl` is reported as statically
+          # linked; every other invocation is delegated unchanged to the real ldd.
+          if [ ! -e /usr/bin/ldd.real ]; then
+            sudo mv /usr/bin/ldd /usr/bin/ldd.real
+          fi
+          sudo tee /usr/bin/ldd >/dev/null <<'LDD_WRAPPER'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          target=""
+          for arg in "$@"; do
+            case "$arg" in
+              -*) ;;
+              *) target="$arg"; break ;;
+            esac
+          done
+          if [ -n "$target" ] && [ "$(basename "$target")" = "owl" ]; then
+            echo "	statically linked"
+            exit 0
+          fi
+          exec /usr/bin/ldd.real "$@"
+          LDD_WRAPPER
+          sudo chmod +x /usr/bin/ldd
+          echo "ldd wrapper installed; real ldd at /usr/bin/ldd.real"
       - name: Build Tauri bundles
         uses: tauri-apps/tauri-action@v0
-        env:
-          # linuxdeploy's AppImage runtime needs FUSE; on GitHub-hosted Ubuntu
-          # runners FUSE is unavailable, so extract-and-run avoids the failure.
-          APPIMAGE_EXTRACT_AND_RUN: "1"
         with:
-          args: --ci --bundles ${{ matrix.bundles }}
+          # --verbose surfaces linuxdeploy stderr in the action log if AppImage
+          # bundling fails again, instead of the bare "failed to run linuxdeploy".
+          args: --ci --verbose --bundles ${{ matrix.bundles }}
       - name: Verify bundle layout
         run: bun run scripts/verify-desktop-bundle.ts --platform ${{ matrix.platform }}
       - name: Collect installer assets
