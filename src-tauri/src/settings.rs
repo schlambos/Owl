@@ -1,17 +1,14 @@
-//! Desktop settings: small validated JSON persisted atomically under the
-//! app config directory. First launch collects the project root and the
-//! OpenCode config root through native folder dialogs (owned by Rust, via
-//! tauri-plugin-dialog; the frontend has no dialog/fs permissions at all).
-//!
-//! Blocking plugin calls must not run on the main thread; the caller of
-//! [`load_or_prompt`] runs on a dedicated bootstrap worker thread while the
-//! event loop is live, which is exactly where blocking dialogs are safe.
+//! Desktop settings: small validated JSON persisted atomically under the app
+//! config directory. Launch NEVER shows folder-selection dialogs: persisted
+//! valid settings win; otherwise the environment is auto-detected
+//! (see `detect.rs` for the exact order and fallbacks) and the detected
+//! result is persisted for subsequent launches.
 
+use crate::detect;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_dialog::DialogExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
@@ -22,20 +19,53 @@ pub struct Settings {
     pub opencode_config_dir: String,
 }
 
-pub enum SettingsError {
-    /// User cancelled a first-launch folder dialog: exit without error.
-    Cancelled,
-    Failed(String),
+fn process_env(key: &str) -> Option<String> {
+    std::env::var(key).ok()
 }
 
-/// Load persisted settings, or run the first-launch folder-dialog flow and
-/// persist the result atomically. Cancel exits (the caller maps `Cancelled`
-/// to a quiet zero exit).
-pub fn load_or_prompt(app: &AppHandle) -> Result<Settings, SettingsError> {
+/// OS user home without extra dependencies (tauri path resolvers are
+/// app-scoped, not user-scoped).
+fn user_home() -> Option<PathBuf> {
+    if let Some(h) = std::env::var_os("HOME") {
+        let p = PathBuf::from(h);
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    #[cfg(windows)]
+    {
+        if let Some(h) = std::env::var_os("USERPROFILE") {
+            let p = PathBuf::from(h);
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+        if let (Some(d), Some(p)) = (
+            std::env::var_os("HOMEDRIVE"),
+            std::env::var_os("HOMEPATH"),
+        ) {
+            let p = PathBuf::from(d).join(p);
+            if p.is_dir() {
+                return Some(p);
+            }
+        }
+    }
+    None
+}
+
+fn exe_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("/"))
+}
+
+/// Load persisted settings, or auto-detect and persist them. No dialogs.
+pub fn load_or_detect(app: &AppHandle) -> Result<Settings, String> {
     let config_dir = app
         .path()
         .app_config_dir()
-        .map_err(|e| SettingsError::Failed(format!("app config dir unavailable: {e}")))?;
+        .map_err(|e| format!("app config dir unavailable: {e}"))?;
     let path = config_dir.join("settings.json");
 
     if let Some(s) = try_load(&path) {
@@ -43,10 +73,41 @@ pub fn load_or_prompt(app: &AppHandle) -> Result<Settings, SettingsError> {
             return Ok(s);
         }
         // Persisted settings are corrupt or point at vanished directories:
-        // fall through to the first-launch flow and re-prompt.
+        // fall through to detection. Existing valid v1 settings above always
+        // win; user choices are never erased.
     }
 
-    prompt_and_save(app, &path)
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app data dir unavailable: {e}"))?;
+    let runtime_dir = app_data.join("runtime");
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let home = user_home();
+
+    let settings = Settings {
+        version: 1,
+        project_directory: detect::detect_project_dir(
+            &process_env,
+            &args,
+            &exe_dir(),
+            &runtime_dir,
+            home.as_deref(),
+        )?
+        .to_string_lossy()
+        .into_owned(),
+        opencode_config_dir: detect::detect_opencode_config_dir(
+            &process_env,
+            home.as_deref(),
+        )?
+        .to_string_lossy()
+        .into_owned(),
+    };
+    validate(&settings)?;
+
+    // Persist detected settings atomically so subsequent launches reuse them.
+    save_atomic(&path, &settings)?;
+    Ok(settings)
 }
 
 fn try_load(path: &Path) -> Option<Settings> {
@@ -78,7 +139,6 @@ fn validate(s: &Settings) -> Result<(), String> {
 }
 
 /// Persist settings atomically: write a sibling temp file, then rename.
-/// `fs::rename` replaces the destination atomically on the same volume.
 fn save_atomic(path: &Path, settings: &Settings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -92,35 +152,4 @@ fn save_atomic(path: &Path, settings: &Settings) -> Result<(), String> {
     fs::rename(&tmp, path)
         .map_err(|e| format!("cannot finalize settings {}: {e}", path.display()))?;
     Ok(())
-}
-
-fn pick_folder(app: &AppHandle, title: &str) -> Option<PathBuf> {
-    let picked = app
-        .dialog()
-        .file()
-        .set_title(title)
-        .blocking_pick_folder()?;
-    picked.into_path().ok()
-}
-
-fn prompt_and_save(app: &AppHandle, path: &Path) -> Result<Settings, SettingsError> {
-    let project = pick_folder(
-        app,
-        "Owl: select the project folder to manage",
-    )
-    .ok_or(SettingsError::Cancelled)?;
-    let config = pick_folder(
-        app,
-        "Owl: select your OpenCode config directory (e.g. ~/.config/opencode)",
-    )
-    .ok_or(SettingsError::Cancelled)?;
-
-    let settings = Settings {
-        version: 1,
-        project_directory: project.to_string_lossy().into_owned(),
-        opencode_config_dir: config.to_string_lossy().into_owned(),
-    };
-    validate(&settings).map_err(SettingsError::Failed)?;
-    save_atomic(path, &settings).map_err(SettingsError::Failed)?;
-    Ok(settings)
 }

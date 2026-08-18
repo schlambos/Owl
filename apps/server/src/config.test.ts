@@ -352,6 +352,23 @@ describe("loadServerConfig directory resolution", () => {
     }
   });
 
+  test("non-empty XDG_CONFIG_HOME selects default config dir over ~/.config", () => {
+    const xdg = makeTempDir();
+    const project = makeTempDir();
+    const xdgConfig = join(xdg, "opencode");
+    try {
+      mkdirSync(xdgConfig);
+      const cfg = loadServerConfig({
+        XDG_CONFIG_HOME: xdg,
+        OMO_CP_PROJECT_DIR: project,
+      });
+      expect(cfg.opencodeConfigDir).toBe(realpathSync(xdgConfig));
+    } finally {
+      cleanup(xdg);
+      cleanup(project);
+    }
+  });
+
   test("default project is current cwd when OMO_CP_PROJECT_DIR absent", () => {
     const cwdTemp = makeTempDir();
     const config = makeTempDir();

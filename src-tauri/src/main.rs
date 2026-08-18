@@ -1,15 +1,17 @@
 //! Owl desktop shell (Tauri).
 //!
-//! Rust owns the entire desktop lifecycle: first-launch folder dialogs,
-//! settings persistence, runtime staging, sidecar spawn/readiness, the main
-//! window, and shutdown. The frontend has zero Tauri permissions — it is just
-//! the sidecar SPA loaded from its exact loopback origin.
+//! Rust owns the entire desktop lifecycle: settings auto-detection and
+//! persistence (no first-launch dialogs), runtime staging, sidecar
+//! spawn/readiness, the main window, and shutdown. The frontend has zero
+//! Tauri permissions — it is just the sidecar SPA loaded from its exact
+//! loopback origin.
 
+mod detect;
 mod settings;
 mod sidecar;
 mod staging;
 
-use settings::{load_or_prompt, SettingsError};
+use settings::load_or_detect;
 use sidecar::{new_launch_token, spawn_and_wait_ready};
 use staging::stage_runtime;
 use std::io::{Read, Write};
@@ -65,20 +67,11 @@ fn show_fatal(app: &AppHandle, message: &str) {
         .blocking_show();
 }
 
-enum BootError {
-    Cancelled,
-    Failed(String),
-}
-
-fn bootstrap(app: &AppHandle) -> Result<(Child, String, String), BootError> {
-    let settings = load_or_prompt(app).map_err(|e| match e {
-        SettingsError::Cancelled => BootError::Cancelled,
-        SettingsError::Failed(m) => BootError::Failed(m),
-    })?;
-    let runtime = stage_runtime(app).map_err(BootError::Failed)?;
+fn bootstrap(app: &AppHandle) -> Result<(Child, String, String), String> {
+    let settings = load_or_detect(app)?;
+    let runtime = stage_runtime(app)?;
     let token = new_launch_token();
-    let (child, origin) =
-        spawn_and_wait_ready(&runtime, &settings, &token).map_err(BootError::Failed)?;
+    let (child, origin) = spawn_and_wait_ready(&runtime, &settings, &token)?;
     Ok((child, origin, token))
 }
 
@@ -198,9 +191,10 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            // Bootstrap on a dedicated worker thread with the event loop
-            // live: blocking folder dialogs are only safe off the main
-            // thread, and the WebView window must be created back on it.
+            // Bootstrap (detect/persist settings, stage runtime, spawn and
+            // wait for the sidecar) on a dedicated worker thread with the
+            // event loop live; the WebView window must be created back on
+            // the main thread.
             thread::spawn(move || match bootstrap(&handle) {
                 Ok((child, origin, token)) => {
                     handle.manage(AppState {
@@ -216,10 +210,7 @@ fn main() {
                         }
                     });
                 }
-                Err(BootError::Cancelled) => {
-                    handle.exit(0);
-                }
-                Err(BootError::Failed(message)) => {
+                Err(message) => {
                     show_fatal(&handle, &message);
                     handle.exit(1);
                 }

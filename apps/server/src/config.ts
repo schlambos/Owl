@@ -231,7 +231,9 @@ export function loadServerConfig(
         );
 
   // OPENCODE_CONFIG_DIR selects the active OpenCode config directory.
-  // When unset, the conventional home location is used and must exist.
+  // When unset, the conventional location mirrors official OpenCode
+  // (non-empty $XDG_CONFIG_HOME/opencode, else ~/.config/opencode — the
+  // same order the desktop shell auto-detects) and must exist.
   let opencodeConfigDir: string;
   if (env.OPENCODE_CONFIG_DIR !== undefined) {
     opencodeConfigDir = resolveAuthorizedRealDirectory(
@@ -239,7 +241,10 @@ export function loadServerConfig(
       "OPENCODE_CONFIG_DIR",
     );
   } else {
-    const defaultConfigDir = join(homedir(), ".config", "opencode");
+    const xdg = env.XDG_CONFIG_HOME?.trim();
+    const defaultConfigDir = xdg
+      ? join(xdg, "opencode")
+      : join(homedir(), ".config", "opencode");
     opencodeConfigDir = resolveAuthorizedRealDirectory(
       defaultConfigDir,
       `Default OpenCode config directory (${defaultConfigDir})`,

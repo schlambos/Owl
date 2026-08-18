@@ -160,12 +160,25 @@ shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 
 ### First launch
 
-On the first launch Owl asks — through native folder dialogs — for two directories:
+Owl auto-detects its environment — **no folder-selection dialogs ever appear**.
 
-1. the **project folder** you want Owl to manage, and
-2. your **OpenCode config directory** (typically `~/.config/opencode`).
+Your **OpenCode config directory** is resolved in this order:
 
-Both choices are validated and persisted (small JSON under the app's config directory); subsequent launches reuse them. Cancelling either dialog exits the app without writing anything.
+1. an inherited, non-empty `OPENCODE_CONFIG_DIR` pointing at an existing directory;
+2. `$XDG_CONFIG_HOME/opencode` when `XDG_CONFIG_HOME` is non-empty;
+3. `~/.config/opencode` (macOS/Windows/Linux alike).
+
+The conventional default is created if missing instead of asking.
+
+The **project directory** is resolved in this order:
+
+1. an inherited, non-empty `OMO_CP_PROJECT_DIR` pointing at an existing directory;
+2. a launch argument that is an existing directory (including folders dropped onto the app);
+3. an already-running OpenCode at `127.0.0.1:4096` (its live `/path` project);
+4. the current working directory when it is a real workspace (contains `.git`, `.opencode`, or `package.json`);
+5. your home directory as the last resort.
+
+Detected paths are validated and persisted (small JSON under the app's config directory); subsequent launches reuse them. Delete that settings file to re-detect from scratch.
 
 The desktop app then starts its bundled sidecar on an ephemeral loopback port and loads the Owl UI from that exact origin. Closing the window shuts the sidecar down gracefully (authenticated loopback shutdown, then a bounded hard stop). OpenCode and OMO-Slim prerequisites apply exactly as with the source run: a working OpenCode install, Oh My OpenCode Slim installed in the selected config directory, and `@opencode-ai/sdk@1.18.14` under that config directory's `node_modules`.
 
@@ -303,7 +316,7 @@ The deeper implementation notes live in [`docs/architecture`](docs/architecture/
 
 ## Project status
 
-Owl is at `0.1.0` and is being released as a working early-stage project. The main configuration, safety, diagnostics, model, agent, runtime, Council, ACP, and system-management surfaces are implemented, but OpenCode and OMO-Slim continue to evolve.
+Owl is at `0.1.1` and is being released as a working early-stage project. The main configuration, safety, diagnostics, model, agent, runtime, Council, ACP, and system-management surfaces are implemented, but OpenCode and OMO-Slim continue to evolve.
 
 Owl prefers an honest `unknown` or `unavailable` state over inventing runtime data that the installed versions do not expose. Expect version-specific limitations around some OMO-Slim runtime details.
 
