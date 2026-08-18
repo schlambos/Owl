@@ -8,11 +8,13 @@
  *  - the expected installer/bundle outputs exist for the platform;
  *  - the bundled app contains the compiled sidecar and the staged runtime
  *    resources (web SPA, package identity, telemetry bridge source);
- *  - no CLI release archives (*.tar.gz) exist anywhere in the output tree.
+ *  - no legacy CLI release archives (owl-v<version>-<platform>.tar.gz/.tgz)
+ *    exist anywhere in the output tree (the Tauri `Owl.app.tar.gz` app-bundle
+ *    archive is allowed).
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve, dirname } from "node:path";
+import { isAbsolute, join, resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -151,12 +153,16 @@ function main(): void {
     if (appImages.length === 0) failures.push(`no .AppImage under ${join(bundle, "appimage")}`);
   }
 
-  // No CLI tar.gz archives anywhere in the build output.
+  // No legacy CLI release archives anywhere in the build output. The old CLI
+  // payloads were named `owl-v<version>-<platform>.tar.gz` (and `.tgz`); the
+  // Tauri app-bundle archive `Owl.app.tar.gz` is a legitimate macOS output and
+  // must be allowed.
   const releaseDir = join(root, "target", "release");
   if (existsSync(releaseDir)) {
     for (const f of walk(releaseDir)) {
-      if (f.endsWith(".tar.gz") || f.endsWith(".tgz")) {
-        failures.push(`CLI archive present in build output: ${f}`);
+      const base = basename(f);
+      if (/^owl-v[^-]+-[a-z0-9-]+\.(tar\.gz|tgz)$/.test(base)) {
+        failures.push(`legacy CLI archive present in build output: ${f}`);
       }
     }
   }
