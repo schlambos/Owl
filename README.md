@@ -140,26 +140,39 @@ bun run dev
 
 Both paths must already exist and must be absolute. Owl fails closed on blank, relative, missing, or non-directory roots.
 
-## Prebuilt binaries
+## Desktop apps
 
-Trigger **Build release artifacts** manually from the **Actions** tab and download the artifact for your platform (`owl-windows-x64`, `owl-darwin-arm64`, `owl-linux-x64`). Extract the archive and preserve the directory structure — the binary expects its sibling assets alongside it.
+Owl ships as a signed-installer-free desktop app (Tauri shell + bundled Bun sidecar) from the **Desktop release** workflow. Releases are created as **drafts** and published by a maintainer.
 
-Prebuilt binaries still require an existing OpenCode config directory with Oh My OpenCode Slim installed and `@opencode-ai/sdk@1.18.14` available under that config directory's `node_modules`.
+Download the installer for your platform from the release page:
+
+| Platform | Files | Notes |
+| --- | --- | --- |
+| macOS (Apple Silicon) | `Owl_<version>_aarch64.dmg` (drag to Applications) or `Owl_aarch64.app.zip` | Built on macos-14 |
+| Windows (x64) | `Owl_<version>_x64-setup.exe` | NSIS installer |
+| Linux (x64) | `Owl_<version>_amd64.deb` or `Owl_<version>_amd64.AppImage` | Debian/Ubuntu-family deb; AppImage is distribution-portable |
+
+Every release asset has a matching SHA256 entry in `SHA256SUMS.txt` — verify before installing:
 
 ```bash
-# Run with defaults (project = current directory, config = ~/.config/opencode)
-./owl            # or owl.exe on Windows
-
-# Explicit project / config
-OMO_CP_PROJECT_DIR=/absolute/path/to/your_project ./owl
-OPENCODE_CONFIG_DIR=/absolute/path/to/opencode-config OMO_CP_PROJECT_DIR=/absolute/path/to/your_project ./owl
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
 ```
 
-Open `http://127.0.0.1:8787` for the UI.
+### First launch
 
-Notes:
-- macOS build is unsigned — allow it via **System Settings → Privacy & Security** or right-click → Open, and clear Gatekeeper with `xattr -d com.apple.quarantine ./owl` if needed.
-- Linux build is Ubuntu 22.04-built, glibc 2.35+ x64 baseline, not every Debian.
+On the first launch Owl asks — through native folder dialogs — for two directories:
+
+1. the **project folder** you want Owl to manage, and
+2. your **OpenCode config directory** (typically `~/.config/opencode`).
+
+Both choices are validated and persisted (small JSON under the app's config directory); subsequent launches reuse them. Cancelling either dialog exits the app without writing anything.
+
+The desktop app then starts its bundled sidecar on an ephemeral loopback port and loads the Owl UI from that exact origin. Closing the window shuts the sidecar down gracefully (authenticated loopback shutdown, then a bounded hard stop). OpenCode and OMO-Slim prerequisites apply exactly as with the source run: a working OpenCode install, Oh My OpenCode Slim installed in the selected config directory, and `@opencode-ai/sdk@1.18.14` under that config directory's `node_modules`.
+
+> [!WARNING]
+> The macOS and Windows installers are **unsigned**. On macOS, allow the app via **System Settings → Privacy & Security** (or remove quarantine with `xattr -dr com.apple.quarantine /Applications/Owl.app`). On Windows, click **More info → Run anyway** on the SmartScreen prompt.
+
+Linux builds are produced on Ubuntu 22.04 (glibc 2.35+) but the AppImage carries its own runtime payload; the deb targets Debian/Ubuntu-family systems.
 
 ## Managed and Attach modes
 
@@ -254,6 +267,7 @@ apps/web                      React 19 + TypeScript + Vite
 apps/server                   Bun HTTP server + SQLite + JSONC tooling
 packages/shared               Shared REST/SSE contracts
 packages/omo-telemetry-bridge Optional OpenCode plugin
+src-tauri                     Desktop shell (Tauri 2, Rust)
 ```
 
 The browser never edits configuration files directly. All parsing, resolution, validation, write transactions, backups, runtime communication, and filesystem checks live in the local server.
@@ -273,6 +287,16 @@ bun run typecheck
 bun run build
 bun test
 bun run audit:omo-schema
+```
+
+For desktop work (requires a Rust toolchain):
+
+```bash
+bun run desktop:prepare   # build SPA resources + compile the host sidecar
+bun run desktop:smoke     # sidecar desktop-mode smoke test
+bun run desktop:dev       # tauri dev
+bun run desktop:build     # tauri build (platform bundles)
+bun run desktop:verify    # verify bundle layout after desktop:build
 ```
 
 The deeper implementation notes live in [`docs/architecture`](docs/architecture/README.md). [`PLAN.md`](PLAN.md) records the complete product direction and design constraints.

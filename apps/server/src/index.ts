@@ -110,6 +110,7 @@ import {
 } from "./opencode-bridge/drift-route";
 import { sanitizeOpenCodeError } from "./opencode/security";
 import { handleReleaseWeb } from "./release-web";
+import { handleInternalShutdown } from "./internal-shutdown";
 // ── Slice 17: bridge composition imports ──────────────────────────────
 import {
   BridgeRevisionStore,
@@ -1158,13 +1159,58 @@ const sourceWatcher = createSourceWatcher({
 });
 sourceWatcher.start();
 
+// ── Desktop CORS origin + response security headers ────────────────
+// In desktop sidecar mode the allow-origin is pinned to the exact bound
+// loopback origin (`http://127.0.0.1:<port>`) instead of `*`. The origin is
+// known only after Bun.serve binds the ephemeral port, so it is set below.
+let corsAllowOrigin = "*";
+function setDesktopCorsOrigin(origin: string): void {
+  corsAllowOrigin = origin;
+}
+
+/**
+ * Baseline response hardening. The theme bootstrap in apps/web/index.html is
+ * a single inline <script>; its sha256 is allowlisted (update the hash if
+ * that script changes). Styles need 'unsafe-inline' for React inline styles
+ * and Monaco-triggered dynamic <style> injection.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  "content-security-policy":
+    "default-src 'self'; " +
+    "script-src 'self' 'sha256-/aN6Hwg9DHoayJ+5tY/jvmOjV7EbbMkp/k2FOpILhmA='; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "font-src 'self'; " +
+    "connect-src 'self'; " +
+    "worker-src 'self' blob:; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'none'",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+};
+
+/** Stamp security headers onto every response without touching the body. */
+function withSecurityHeaders(res: Response): Response {
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(k)) headers.set(k, v);
+  }
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "access-control-allow-origin": "*",
+      "access-control-allow-origin": corsAllowOrigin,
       "access-control-allow-methods": "GET,POST,OPTIONS",
       "access-control-allow-headers": "content-type",
     },
@@ -1173,7 +1219,7 @@ function json(data: unknown, status = 200): Response {
 
 function corsHeaders(): Record<string, string> {
   return {
-    "access-control-allow-origin": "*",
+    "access-control-allow-origin": corsAllowOrigin,
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type",
   };
@@ -1302,11 +1348,9 @@ export function canonicalBackendUrl(): string | undefined {
   return lifecycle.getState().baseUrl;
 }
 
-const server = Bun.serve({
-  hostname: cfg.host,
-  port: cfg.port,
-  idleTimeout: 255,
-  async fetch(req) {
+let serverRef: ReturnType<typeof Bun.serve> | undefined;
+
+async function handleRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
     // Drift-acceptance routes are mounted BEFORE the generic OPTIONS/CORS
@@ -1317,7 +1361,7 @@ const server = Bun.serve({
       return handleBridgeDriftRoute(req, {
         loopbackBind: ["127.0.0.1", "localhost", "::1"].includes(cfg.host),
         requestAddress: (r: Request): string | undefined =>
-          server.requestIP(r)?.address,
+          serverRef?.requestIP(r)?.address,
         getService: () =>
           bridgeRevisionDbOk && bridgeService ? bridgeService : undefined,
         overrideActive: () => cfg.omoBridgeOverride?.optsOutOfManagement === true,
@@ -1356,6 +1400,18 @@ const server = Bun.serve({
           broadcastBridgeStatus();
           return disposition;
         },
+      });
+    }
+
+    // ── Desktop sidecar shutdown (loopback + per-launch token) ────────
+    // Registered only in desktop mode; mounted before OPTIONS/CORS so a
+    // preflight can never probe it. See internal-shutdown.ts for the
+    // security contract.
+    if (cfg.desktop && url.pathname === "/internal/shutdown") {
+      return handleInternalShutdown(req, {
+        token: cfg.desktop.shutdownToken,
+        requestAddress: serverRef?.requestIP(req)?.address,
+        onShutdown: () => void shutdown("internal-shutdown"),
       });
     }
 
@@ -2537,8 +2593,25 @@ const server = Bun.serve({
         500,
       );
     }
+}
+
+const server = Bun.serve({
+  hostname: cfg.host,
+  port: cfg.port,
+  idleTimeout: 255,
+  async fetch(req) {
+    return withSecurityHeaders(await handleRequest(req));
   },
 });
+serverRef = server;
+
+if (cfg.desktop) {
+  // Exact, parseable readiness line for the desktop shell. Must be the only
+  // line with this prefix on stdout.
+  const origin = `http://127.0.0.1:${server.port}`;
+  setDesktopCorsOrigin(origin);
+  console.log(`OWL_READY ${origin}`);
+}
 
 console.log(`[omo-cp] listening on http://${server.hostname}:${server.port}`);
 console.log(`[omo-cp] OpenCode lifecycle mode: ${cfg.opencodeMode}`);
@@ -2567,6 +2640,15 @@ async function shutdown(signal: string): Promise<void> {
   // Composition root owns and closes bridge store only after lifecycle.stop.
   try { bridgeRevisions?.close(); } catch { /* idempotent */ }
   server.stop(true);
+  if (cfg.desktop) {
+    // Desktop shutdown is initiated over HTTP (or a signal) rather than by
+    // the owning terminal; exit explicitly so the sidecar process always
+    // terminates after graceful cleanup instead of waiting on stragglers.
+    const t = setTimeout(() => process.exit(0), 100) as unknown as {
+      unref?: () => void;
+    };
+    t.unref?.();
+  }
 }
 
 process.once("SIGINT", () => void shutdown("SIGINT"));

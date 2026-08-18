@@ -1,0 +1,149 @@
+name: Desktop release
+
+# Builds the Tauri desktop apps and publishes a DRAFT GitHub release with:
+#   - macOS ARM64 .app + .dmg        (macos-14)
+#   - Windows x64 NSIS setup .exe    (windows-2022)
+#   - Linux x64 .deb + .AppImage     (ubuntu-22.04)
+# The bundled Bun sidecar is compiled per target, smoke-tested in desktop
+# mode, and no CLI tar.gz release archives are produced anymore.
+# The release stays a draft until a maintainer publishes it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create/update (draft)"
+        required: true
+        default: "v0.1.0"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Server typecheck
+        run: bun run --filter @omo/server typecheck
+      - name: Bridge typecheck
+        run: bun run --filter @omo/telemetry-bridge typecheck
+      - name: Focused config tests
+        run: bun test apps/server/src/config.test.ts apps/server/src/release-web.test.ts
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            target: darwin-arm64
+            platform: macos
+            bundles: "app,dmg"
+            artifact: owl-desktop-macos-arm64
+          - runner: windows-2022
+            target: windows-x64
+            platform: windows
+            bundles: "nsis"
+            artifact: owl-desktop-windows-x64
+          - runner: ubuntu-22.04
+            target: linux-x64
+            platform: linux
+            bundles: "deb,appimage"
+            artifact: owl-desktop-linux-x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Install Linux Tauri prerequisites
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Prepare desktop assets and compile target sidecar
+        run: bun run scripts/prepare-desktop-assets.ts --target ${{ matrix.target }}
+      - name: Smoke sidecar (desktop mode)
+        run: bun run scripts/smoke-sidecar.ts
+      - name: Build Tauri bundles
+        uses: tauri-apps/tauri-action@v0
+        with:
+          args: --ci --bundles ${{ matrix.bundles }}
+      - name: Verify bundle layout
+        run: bun run scripts/verify-desktop-bundle.ts --platform ${{ matrix.platform }}
+      - name: Collect installer assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${{ runner.temp }}/release-assets"
+          mkdir -p "$out"
+          b="src-tauri/target/release/bundle"
+          case "${{ matrix.platform }}" in
+            macos)
+              cp "$b"/dmg/*.dmg "$out"/
+              ditto -c -k --sequesterRsrc --keepParent "$b/macos/Owl.app" "$out/Owl_aarch64.app.zip"
+              ;;
+            windows)
+              cp "$b"/nsis/*.exe "$out"/
+              ;;
+            linux)
+              cp "$b"/deb/*.deb "$out"/
+              cp "$b"/appimage/*.AppImage "$out"/
+              ;;
+          esac
+          ls -la "$out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ runner.temp }}/release-assets/*
+          if-no-files-found: error
+          compression-level: 0
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: owl-desktop-*
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd assets
+          sha256sum -- * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          draft: true
+          generate_release_notes: true
+          files: assets/*

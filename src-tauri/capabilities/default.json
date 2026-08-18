@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Owl desktop: the webview loads the local sidecar SPA over loopback HTTP. No Tauri shell/fs/dialog (or any other) APIs are exposed to the frontend; setup dialogs and lifecycle are owned entirely by Rust.",
+  "windows": ["main"],
+  "permissions": []
+}

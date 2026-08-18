@@ -17,9 +17,25 @@ const OWL_INSTALL_PACKAGE_NAME = "omo-control-plane";
 /** Maximum ancestor directories walked above the start directory. */
 const MAX_INSTALL_ROOT_ANCESTOR_HOPS = 10;
 
+export interface DesktopModeConfig {
+  /**
+   * Unpredictable per-launch token (env OMO_CP_SHUTDOWN_TOKEN). Required for
+   * the loopback-only `POST /internal/shutdown` route. Never logged or
+   * exposed through any API response.
+   */
+  shutdownToken: string;
+}
+
 export interface ServerConfig {
   host: string;
   port: number;
+  /**
+   * Desktop (Tauri sidecar) mode, selected by `OMO_CP_DESKTOP=1`. Forces the
+   * loopback host and an ephemeral port (0), requires a shutdown token, and
+   * emits an exact `OWL_READY http://127.0.0.1:<port>` line on stdout once
+   * the listener is bound.
+   */
+  desktop?: DesktopModeConfig;
   /** Presence of OPENCODE_BASE_URL selects attach; absence selects managed. */
   opencodeMode?: "managed" | "attach";
   /** Raw attach request. It is validated by the lifecycle manager and has no default. */
@@ -193,8 +209,15 @@ export function loadServerConfig(
   env: Record<string, string | undefined> = process.env,
 ): ServerConfig {
   // Install root derives from production default start (standalone-aware)
-  // only. Never cwd.
-  const owlInstallDirectory = resolveOwlInstallDirectory();
+  // only. Never cwd. OMO_CP_INSTALL_DIR (used by the desktop sidecar) must
+  // point at a real install root: it is validated as a directory first and
+  // must still pass the package-name proof walk.
+  const owlInstallDirectory =
+    env.OMO_CP_INSTALL_DIR !== undefined
+      ? resolveOwlInstallDirectory(
+          resolveAuthorizedRealDirectory(env.OMO_CP_INSTALL_DIR, "OMO_CP_INSTALL_DIR"),
+        )
+      : resolveOwlInstallDirectory();
 
   // OMO_CP_PROJECT_DIR is the project-root authority. When unset, the
   // project root is the realpath of process.cwd() at load time (which must
@@ -242,9 +265,24 @@ export function loadServerConfig(
   const omoBridgeOverride = validateBridgeOverride(omoBridgeRaw);
   const omoBridgeBaseUrl = omoBridgeOverride.invalid ? undefined : omoBridgeOverride.url;
 
+  // Desktop sidecar mode: loopback host and ephemeral port are fixed by the
+  // desktop shell; the launch token must be unpredictable and is never
+  // defaulted—fail closed when it is absent or trivially short.
+  let desktop: DesktopModeConfig | undefined;
+  if (env.OMO_CP_DESKTOP === "1") {
+    const token = env.OMO_CP_SHUTDOWN_TOKEN?.trim() ?? "";
+    if (token.length < 16) {
+      throw new Error(
+        "OMO_CP_DESKTOP=1 requires OMO_CP_SHUTDOWN_TOKEN with at least 16 characters",
+      );
+    }
+    desktop = { shutdownToken: token };
+  }
+
   return {
-    host: env.OMO_CP_HOST ?? "127.0.0.1",
-    port: Number(env.OMO_CP_PORT ?? 8787),
+    host: desktop ? "127.0.0.1" : (env.OMO_CP_HOST ?? "127.0.0.1"),
+    port: desktop ? 0 : Number(env.OMO_CP_PORT ?? 8787),
+    ...(desktop ? { desktop } : {}),
     opencodeMode: attachRequested ? "attach" : "managed",
     ...(attachRequested
       ? { opencodeAttachBaseUrl: env.OPENCODE_BASE_URL }

@@ -12,6 +12,14 @@
     "typecheck": "bun run --filter @omo/shared typecheck && bun run --filter @omo/server typecheck && bun run --filter @omo/web typecheck",
     "audit:omo-schema": "bun run scripts/audit-installed-omo-schema.ts",
     "test:telemetry-bridge": "bun run --filter @omo/telemetry-bridge test",
-    "typecheck:telemetry-bridge": "bun run --filter @omo/telemetry-bridge typecheck"
+    "typecheck:telemetry-bridge": "bun run --filter @omo/telemetry-bridge typecheck",
+    "desktop:prepare": "bun run scripts/prepare-desktop-assets.ts",
+    "desktop:smoke": "bun run scripts/smoke-sidecar.ts",
+    "desktop:verify": "bun run scripts/verify-desktop-bundle.ts",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
   }
 }
