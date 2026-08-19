@@ -1,11 +1,15 @@
 name: Desktop release
 
 # Builds the Tauri desktop apps and publishes a DRAFT GitHub release with:
-#   - macOS ARM64 .app + .dmg        (macos-14)
-#   - Windows x64 NSIS setup .exe    (windows-2022)
-#   - Linux x64 .deb + .AppImage     (ubuntu-22.04)
+#   - macOS ARM64 .app + .dmg                    (macos-14)
+#   - Windows x64 NSIS setup .exe                (windows-2022)
+#   - Linux x64 .deb + .AppImage                 (ubuntu-22.04)
+#   - Arch/CachyOS x86_64 .pkg.tar.zst (native)  (ubuntu-22.04 in archlinux:base-devel)
 # The bundled Bun sidecar is compiled per target, smoke-tested in desktop
 # mode, and no CLI tar.gz release archives are produced anymore.
+# The Arch package is built natively via makepkg in the official
+# archlinux:base-devel container (see packaging/arch/PKGBUILD), not by
+# repacking the Ubuntu output. CachyOS consumes the same package.
 # The release stays a draft until a maintainer publishes it.
 
 on:
@@ -14,7 +18,7 @@ on:
       tag:
         description: "Release tag to create/update (draft)"
         required: true
-        default: "v0.1.0"
+        default: "v0.1.2"
   push:
     tags:
       - "v*"
@@ -170,8 +174,97 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+  # Native Arch Linux / CachyOS x86_64 package: built with makepkg inside the
+  # official archlinux:base-devel container (rolling distro, full upgrade).
+  # Deliberately separate from the mac/windows/ubuntu matrix — GitHub runs
+  # this job as root, but makepkg refuses root, so the build itself runs as
+  # a created non-root user with workspace access.
+  build-arch:
+    needs: validate
+    runs-on: ubuntu-22.04
+    container: archlinux:base-devel
+    steps:
+      - name: Full system upgrade and bootstrap for JS actions
+        run: |
+          set -euo pipefail
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm git nodejs
+      - uses: actions/checkout@v4
+      - name: Install Arch build/runtime prerequisites
+        run: |
+          set -euo pipefail
+          pacman -S --needed --noconfirm \
+            bun rust \
+            webkit2gtk-4.1 gtk3 libayatana-appindicator librsvg \
+            hicolor-icon-theme desktop-file-utils shared-mime-info \
+            namcap
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+      - name: Prepare desktop assets and compile target sidecar
+        run: bun run scripts/prepare-desktop-assets.ts --target linux-x64
+      - name: Smoke sidecar (desktop mode)
+        run: bun run scripts/smoke-sidecar.ts
+      - name: Build native package (makepkg as non-root)
+        run: |
+          set -euo pipefail
+          useradd -m builder
+          mkdir -p "$GITHUB_WORKSPACE/pkg-out" "$GITHUB_WORKSPACE/.makepkg"
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          runuser -u builder -- bash -c 'cd "$GITHUB_WORKSPACE/packaging/arch" && PKGDEST="$GITHUB_WORKSPACE/pkg-out" BUILDDIR="$GITHUB_WORKSPACE/.makepkg" makepkg -f'
+      - name: Verify package metadata and layout
+        run: |
+          set -euo pipefail
+          pkg=$(ls "$GITHUB_WORKSPACE/pkg-out"/*.pkg.tar.zst)
+          [ -n "$pkg" ] && [ -f "$pkg" ]
+          pacman -Qip "$pkg"
+          pacman -Qlp "$pkg" > /tmp/pkg-files.txt
+          for required in \
+            "/usr/bin/owl-desktop$" \
+            "/usr/bin/owl$" \
+            "/usr/lib/Owl/web/index.html$" \
+            "/usr/lib/Owl/package.json$" \
+            "/usr/lib/Owl/packages/omo-telemetry-bridge/package.json$" \
+            "/usr/lib/Owl/packages/omo-telemetry-bridge/src/index.ts$" \
+            "/usr/lib/Owl/LICENSE$" \
+            "/usr/share/applications/Owl.desktop$" \
+            "owl-desktop.png$" \
+          ; do
+            grep -qe "$required" /tmp/pkg-files.txt || { echo "missing in package: $required"; exit 1; }
+          done
+          if grep -qE 'owl-v.*\.tar\.gz' /tmp/pkg-files.txt; then
+            echo "legacy CLI tarball present in package"
+            exit 1
+          fi
+          namcap "$pkg" || echo "namcap reported advisory findings (non-fatal)"
+      - name: Install package and verify installed system
+        run: |
+          set -euo pipefail
+          pkg=$(ls "$GITHUB_WORKSPACE/pkg-out"/*.pkg.tar.zst)
+          pacman -U --noconfirm "$pkg"
+          pacman -Qk owl-desktop
+          if ldd /usr/bin/owl-desktop 2>/dev/null | grep -q "not found"; then
+            echo "unresolved shared libraries in /usr/bin/owl-desktop"
+            ldd /usr/bin/owl-desktop
+            exit 1
+          fi
+          # Static Bun sidecar: ldd may legitimately report "not a dynamic
+          # executable" — accepted, informational only.
+          ldd /usr/bin/owl || true
+          desktop-file-validate /usr/share/applications/Owl.desktop
+      - name: Smoke installed sidecar
+        run: bun run scripts/smoke-sidecar.ts --bin /usr/bin/owl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owl-desktop-arch-x86_64
+          path: ${{ github.workspace }}/pkg-out/*.pkg.tar.zst
+          if-no-files-found: error
+          compression-level: 0
+
   release:
-    needs: build
+    needs: [build, build-arch]
     runs-on: ubuntu-22.04
     steps:
       - name: Resolve release tag

@@ -1,0 +1,60 @@
+# Maintainer: Owl contributors
+# Native Arch Linux / CachyOS package for the Owl desktop app.
+#
+# Conventions follow the official Tauri AUR documentation
+# (https://v2.tauri.app/distribute/aur/): the Tauri bundler generates a
+# Debian layout inside this build environment and package() copies the
+# generated data/ tree verbatim, which yields exactly:
+#   /usr/bin/owl-desktop                              main Tauri binary
+#   /usr/bin/owl                                      compiled Bun sidecar
+#   /usr/lib/Owl/{web,packages,package.json,LICENSE}  runtime resources
+#   /usr/share/applications + hicolor icons           desktop integration
+#
+# This PKGBUILD is executed from the repository tree (see the
+# desktop-release workflow's build-arch job); $startdir/../.. is the repo
+# root.
+pkgname=owl-desktop
+pkgver=0.1.2
+pkgrel=1
+pkgdesc="Owl desktop — local control plane for OpenCode and Oh My OpenCode Slim"
+arch=('x86_64')
+url="https://github.com/schlambos/Owl"
+license=('Apache-2.0')
+depends=(
+  'webkit2gtk-4.1'          # Tauri/wry webview
+  'gtk3'                    # Tauri/tao/muda link GTK directly
+  'libayatana-appindicator' # Tauri tray/status integration
+  'librsvg'                 # SVG icon rendering for the webview/windowing stack
+  'hicolor-icon-theme'      # fallback icon theme required by freedesktop specs
+  'desktop-file-utils'      # desktop database for the installed .desktop file
+  'shared-mime-info'        # MIME database used by the webview/desktop shell
+)
+makedepends=('bun' 'rust' 'webkit2gtk-4.1')
+# The Bun sidecar (/usr/bin/owl) is a fully self-contained compiled static
+# binary: makepkg must NOT strip/lto it (or Tauri's Rust release profile).
+options=('!strip' '!lto')
+source=()
+sha256sums=()
+
+_repo_root() {
+  realpath "$startdir/../.."
+}
+
+build() {
+  cd "$(_repo_root)"
+  # Release build, Debian layout only — copied verbatim in package().
+  ./node_modules/.bin/tauri build --bundles deb
+}
+
+package() {
+  local root
+  root="$(_repo_root)"
+  local data="$root/src-tauri/target/release/bundle/deb/Owl_${pkgver}_amd64/data"
+  if [ ! -d "$data" ]; then
+    printf 'error: Tauri deb data tree missing: %s\n' "$data" >&2
+    return 1
+  fi
+  install -dm755 "$pkgdir"
+  cp -a "$data/." "$pkgdir/"
+  install -Dm644 "$root/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
