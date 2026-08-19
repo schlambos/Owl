@@ -25,8 +25,10 @@ import {
   type LaunchSecretRedactor,
 } from "../opencode-bridge/launch-boundary";
 import { sanitizeOpenCodeError } from "./security";
-import { statSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { existsSync, statSync } from "node:fs";
+import { spawn, type ChildProcess } from "node:child_process";
+import { homedir } from "node:os";
+import { delimiter, isAbsolute, join } from "node:path";
 
 /**
  * The owned SDK start resolves the active-config SDK install directly from
@@ -208,6 +210,7 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
   //  - capture the returned promise
   // The raw nonce exists ONLY inside this callback scope.
   let spawnPromise: Promise<ManagedSdkHandle> | undefined;
+  let capturedOverlay: LaunchEnvOverlay = {};
   let boundaryError: BridgeLaunchBoundaryError | undefined;
   // Safe redaction closure captured inside the launch boundary scope. It can
   // redact the raw launch nonce from later SDK errors WITHOUT exposing it.
@@ -218,6 +221,7 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
       { store },
       (overlay, redact) => {
         redactLaunchNonce = redact;
+        capturedOverlay = overlay;
         // Delete stale bridge env values.
         deleteBridgeEnv(process.env);
         // Apply the verified overlay (port + raw nonce, or empty when disabled).
@@ -225,7 +229,7 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
         // Invoke createOpencodeServer synchronously and capture the promise.
         // The SDK spreads ...process.env into the child, so the overlay is
         // visible to the synchronous spawn.
-        spawnPromise = sdk.createOpencodeServer(options);
+        spawnPromise = invokeCreateOpencodeServer(sdk.createOpencodeServer, options);
       },
     );
 
@@ -243,7 +247,7 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
     // Disabled lane: no launch boundary, empty overlay.
     deleteBridgeEnv(process.env);
     try {
-      spawnPromise = sdk.createOpencodeServer(options);
+      spawnPromise = invokeCreateOpencodeServer(sdk.createOpencodeServer, options);
     } catch (error) {
       // Restore env before rethrowing.
       restoreBridgeEnv(process.env, priorBridgeEnv);
@@ -267,10 +271,26 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
   try {
     return await spawnPromise!;
   } catch (error) {
-    // A synthetic SDK rejection may embed child stderr/stdout containing
-    // provider credentials, prior parent bridge env values, or the launch
-    // nonce. Redact ALL of them before the error can reach lifecycle state,
-    // diagnostics, or logs.
+    if (isModuleResolutionFailure(error)) {
+      // Compiled Bun sidecars cannot resolve cross-spawn's `which` require
+      // from ~/.config/opencode/node_modules. The SDK's createOpencodeServer
+      // is just `opencode serve` — spawn that CLI directly with the same
+      // args/env contract, including the captured bridge overlay.
+      try {
+        return await startViaOpencodeCli(options, capturedOverlay);
+      } catch (fallbackError) {
+        const transientSecrets: Array<string | undefined> = [
+          process.env.OPENCODE_SERVER_PASSWORD,
+          priorBridgeEnv.OMO_BRIDGE_ACTIVATION_NONCE,
+          priorBridgeEnv.OMO_BRIDGE_PORT,
+          capturedOverlay.OMO_BRIDGE_ACTIVATION_NONCE,
+          capturedOverlay.OMO_BRIDGE_PORT,
+        ];
+        throw new Error(
+          sanitizeSdkStartError(fallbackError, transientSecrets, redactLaunchNonce),
+        );
+      }
+    }
     const transientSecrets: Array<string | undefined> = [
       process.env.OPENCODE_SERVER_PASSWORD,
       priorBridgeEnv.OMO_BRIDGE_ACTIVATION_NONCE,
@@ -281,6 +301,17 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
     );
   }
 };
+
+function invokeCreateOpencodeServer(
+  create: ManagedSdkStarter,
+  options: ManagedSdkStartOptions,
+): Promise<ManagedSdkHandle> {
+  try {
+    return Promise.resolve(create(options));
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
 
 /**
  * Sanitize an asynchronous `createOpencodeServer` rejection.
@@ -309,6 +340,164 @@ export function sanitizeSdkStartError(
   const preRedacted =
     redactLaunchNonce !== undefined ? redactLaunchNonce(original) : original;
   return sanitizeOpenCodeError(preRedacted, transientSecrets);
+}
+
+/** Compiled-sidecar / Bun ResolveMessage: cross-spawn cannot require `which`. */
+export function isModuleResolutionFailure(error: unknown): boolean {
+  const text =
+    error instanceof Error
+      ? `${error.name} ${error.message}`
+      : typeof error === "string"
+        ? error
+        : (() => {
+            try {
+              return JSON.stringify(error) ?? "";
+            } catch {
+              return String(error);
+            }
+          })();
+  return (
+    /Cannot find package ['"]which['"]/i.test(text) ||
+    /ResolveMessage/i.test(text) ||
+    /Cannot find package ['"]cross-spawn['"]/i.test(text)
+  );
+}
+
+const OPENCODE_BIN = process.platform === "win32" ? "opencode.exe" : "opencode";
+
+/**
+ * Resolve the `opencode` CLI the same way a terminal would, plus GUI-safe
+ * extra dirs. Finder-launched macOS apps do not inherit Homebrew PATH.
+ */
+export function resolveOpencodeExecutable(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const extra = [
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    join(homedir(), ".opencode", "bin"),
+    join(homedir(), ".local", "bin"),
+  ];
+  const dirs = [...(env.PATH ?? "").split(delimiter).filter(Boolean), ...extra];
+  const seen = new Set<string>();
+  for (const dir of dirs) {
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    const candidate = join(dir, OPENCODE_BIN);
+    try {
+      if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+    } catch {
+      /* skip unreadable entries */
+    }
+  }
+  throw new Error(
+    "opencode executable not found on PATH (or /opt/homebrew/bin, /usr/local/bin). Install OpenCode and retry.",
+  );
+}
+
+/**
+ * Same contract as installed SDK createOpencodeServer: spawn
+ * `opencode serve --hostname --port`, parse the listening URL, return
+ * { url, close }. Does not use cross-spawn / which.
+ */
+export function startViaOpencodeCli(
+  options: ManagedSdkStartOptions,
+  overlay: LaunchEnvOverlay = {},
+): Promise<ManagedSdkHandle> {
+  const bin = resolveOpencodeExecutable(process.env);
+  const args = [
+    "serve",
+    `--hostname=${options.hostname}`,
+    `--port=${options.port}`,
+  ];
+  const childEnv: NodeJS.ProcessEnv = { ...process.env };
+  if (overlay.OMO_BRIDGE_PORT !== undefined) {
+    childEnv.OMO_BRIDGE_PORT = overlay.OMO_BRIDGE_PORT;
+  }
+  if (overlay.OMO_BRIDGE_ACTIVATION_NONCE !== undefined) {
+    childEnv.OMO_BRIDGE_ACTIVATION_NONCE = overlay.OMO_BRIDGE_ACTIVATION_NONCE;
+  }
+  if (childEnv.OPENCODE_CONFIG_CONTENT === undefined) {
+    childEnv.OPENCODE_CONFIG_CONTENT = "{}";
+  }
+
+  const proc: ChildProcess = spawn(bin, args, {
+    env: childEnv,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  return new Promise<ManagedSdkHandle>((resolve, reject) => {
+    const timeoutMs = options.timeout;
+    let output = "";
+    let settled = false;
+
+    const finish = (err?: Error, handle?: ManagedSdkHandle) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      options.signal?.removeEventListener("abort", onAbort);
+      if (err) {
+        stopChild(proc);
+        reject(err);
+      } else if (handle) {
+        resolve(handle);
+      }
+    };
+
+    const onAbort = () => {
+      finish(options.signal?.reason instanceof Error
+        ? options.signal.reason
+        : new Error("OpenCode CLI start aborted"));
+    };
+
+    const timer = setTimeout(() => {
+      finish(new Error(`Timeout waiting for server to start after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    const onChunk = (chunk: Buffer | string) => {
+      if (settled) return;
+      output += chunk.toString();
+      for (const line of output.split("\n")) {
+        if (!line.startsWith("opencode server listening")) continue;
+        const match = line.match(/on\s+(https?:\/\/[^\s]+)/);
+        if (!match) {
+          finish(new Error(`Failed to parse server url from output: ${line}`));
+          return;
+        }
+        finish(undefined, {
+          url: match[1]!,
+          close() {
+            stopChild(proc);
+          },
+        });
+        return;
+      }
+    };
+
+    proc.stdout?.on("data", onChunk);
+    proc.stderr?.on("data", onChunk);
+    proc.on("error", (error) => finish(error));
+    proc.on("exit", (code) => {
+      if (settled) return;
+      let msg = `Server exited with code ${code}`;
+      if (output.trim()) msg += `\nServer output: ${output}`;
+      finish(new Error(msg));
+    });
+    if (options.signal) {
+      if (options.signal.aborted) onAbort();
+      else options.signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+}
+
+function stopChild(proc: ChildProcess): void {
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  if (process.platform === "win32" && proc.pid) {
+    spawn("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { windowsHide: true });
+    return;
+  }
+  proc.kill();
 }
 
 // ── BridgeRevisionStore injection (composition root sets this) ──────────

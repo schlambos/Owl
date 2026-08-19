@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { createServer } from "node:net";
 import {
   __testOwnedLaunchEnvOverlay,
+  isModuleResolutionFailure,
+  resolveOpencodeExecutable,
   sanitizeSdkStartError,
   type BridgeLaunchBoundaryError,
 } from "./sdk-adapter";
@@ -286,6 +288,31 @@ describe("owned launch env overlay (sdk-adapter)", () => {
   });
 });
 // ── Phase 2 Gate 2: launch-nonce confinement in async SDK rejections ────
+
+describe("compiled-sidecar module-resolution fallback", () => {
+  test("isModuleResolutionFailure matches the live desktop ResolveMessage", () => {
+    const live = {
+      name: "ResolveMessage",
+      message:
+        "Cannot find package 'which' from '/Users/matt/.config/opencode/node_modules/cross-spawn/lib/util/resolveCommand.js'",
+    };
+    expect(isModuleResolutionFailure(live)).toBe(true);
+    expect(isModuleResolutionFailure(new Error(live.message))).toBe(true);
+    expect(isModuleResolutionFailure(new Error("ECONNREFUSED 127.0.0.1:4096"))).toBe(false);
+  });
+
+  test("resolveOpencodeExecutable finds a real opencode binary", () => {
+    const bin = resolveOpencodeExecutable();
+    expect(bin.length).toBeGreaterThan(0);
+    expect(bin.endsWith("opencode") || bin.endsWith("opencode.exe")).toBe(true);
+  });
+
+  test("resolveOpencodeExecutable still finds Homebrew when PATH is empty", () => {
+    // Finder-launched apps often have a stripped PATH; extra dirs must still work.
+    const bin = resolveOpencodeExecutable({ PATH: "/tmp/definitely-missing-opencode-bin" });
+    expect(bin).toBe("/opt/homebrew/bin/opencode");
+  });
+});
 
 describe("sanitizeSdkStartError (launch nonce confinement)", () => {
   test("synthetic SDK rejection containing the launch nonce is redacted", () => {

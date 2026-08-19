@@ -14,7 +14,7 @@
 # desktop-release workflow's build-arch job); $startdir/../.. is the repo
 # root.
 pkgname=owl-desktop
-pkgver=0.1.4
+pkgver=0.1.5
 pkgrel=1
 pkgdesc="Owl desktop — local control plane for OpenCode and Oh My OpenCode Slim"
 arch=('x86_64')
