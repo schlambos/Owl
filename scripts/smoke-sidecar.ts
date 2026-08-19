@@ -23,7 +23,9 @@ import {
   copyFileSync,
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -235,9 +237,11 @@ function startFakeOpenCode(port: number): { stop(): void } {
  * `<projectDir>/data/control-plane-bridge.db` (the sidecar's default path).
  */
 function seedDirtyBridgeState(projectDir: string, configDir: string): void {
+  mkdirSync(join(projectDir, "data"), { recursive: true });
+  mkdirSync(configDir, { recursive: true });
   const dbPath = join(projectDir, "data", "control-plane-bridge.db");
   const configPath = join(configDir, "opencode.json");
-  const store = new BridgeRevisionStore(dbPath, [projectDir, configDir]);
+  const store = new BridgeRevisionStore(dbPath, [realpathSync(projectDir), realpathSync(configDir)]);
   const content = `{"plugin":["/canonical/bridge"]}`;
   writeFileSync(configPath, content, "utf-8");
   const cfgHash = createHash("sha256").update(content).digest("hex");
