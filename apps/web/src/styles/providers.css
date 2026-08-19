@@ -1,0 +1,407 @@
+/* Provider management surfaces — dense engineering console, reusing the
+   existing tokens + shared fallbacks. Unlayered (like team-roster.css) so
+   it wins over legacy fallbacks without specificity games. */
+
+.prov-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  padding-bottom: var(--omo-space-8);
+}
+
+.prov-top-actions {
+  margin-top: calc(-1 * var(--omo-space-2));
+}
+
+.prov-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+.prov-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  background: var(--omo-surface);
+  padding: var(--omo-space-4);
+}
+
+.prov-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prov-name {
+  font-weight: 600;
+}
+
+.prov-table-surface {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-lg);
+  background: var(--omo-surface);
+  overflow: auto;
+}
+
+.prov-table {
+  width: 100%;
+}
+
+.prov-actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.prov-actions-cell > * + * {
+  margin-left: var(--omo-space-2);
+}
+
+/* Forms */
+
+.prov-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--omo-space-3) var(--omo-space-4);
+  align-items: start;
+}
+
+.prov-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-1);
+  min-width: 0;
+}
+
+.prov-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--omo-text-muted);
+}
+
+.prov-input {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--omo-text);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-sm);
+  padding: 7px 10px;
+  min-width: 0;
+}
+
+.prov-input:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+  border-color: var(--omo-focus);
+}
+
+.prov-input-wide {
+  grid-column: 1 / -1;
+}
+
+.prov-input-narrow {
+  width: 90px;
+}
+
+/* Compact select, mirrors the doctor severity select. */
+.prov-select {
+  min-height: 32px;
+  padding: 0 var(--omo-space-2);
+  background: var(--omo-surface);
+  border: 1px solid var(--omo-border-strong);
+  border-radius: var(--omo-radius-md);
+  color: var(--omo-text);
+  font-family: var(--omo-font-sans);
+  font-size: var(--omo-text-sm);
+  box-shadow: var(--omo-shadow-sm);
+  max-width: 220px;
+  min-width: 0;
+}
+
+.prov-select:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+  border-color: var(--omo-focus);
+}
+
+.prov-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--omo-text-faint);
+}
+
+.prov-field-error {
+  margin: 0;
+}
+
+/* Selection chips (mirrors the doctor segmented control) */
+
+.prov-chip-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--omo-space-1);
+}
+
+.prov-chip {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: var(--omo-radius-sm);
+  border: 1px solid var(--omo-border-strong);
+  background: var(--omo-surface);
+  color: var(--omo-text-muted);
+  cursor: pointer;
+}
+
+.prov-chip:hover {
+  background: var(--omo-surface-hover);
+}
+
+.prov-chip[aria-pressed="true"] {
+  background: var(--omo-action-soft);
+  border-color: var(--omo-action);
+  color: var(--omo-text);
+  font-weight: 600;
+}
+
+.prov-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--omo-focus-ring);
+}
+
+.prov-mode {
+  margin-top: 0;
+}
+
+.prov-select {
+  max-width: 180px;
+}
+
+/* Model ticklists */
+
+.prov-model-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.prov-model-row {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  padding: 7px var(--omo-space-3);
+  border-bottom: 1px solid var(--omo-border);
+  font-size: 13px;
+  background: var(--omo-surface);
+  cursor: pointer;
+}
+
+.prov-model-row:last-child {
+  border-bottom: none;
+}
+
+.prov-model-row:hover {
+  background: var(--omo-surface-hover);
+}
+
+.prov-model-row:focus-within {
+  box-shadow: inset 0 0 0 2px var(--omo-focus);
+}
+
+.prov-model-name {
+  font-weight: 500;
+}
+
+/* Review flow */
+
+.prov-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+}
+
+.prov-review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+.prov-review-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--omo-space-3);
+  font-size: 12px;
+}
+
+.prov-review-title {
+  font-weight: 600;
+  color: var(--omo-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.prov-diff {
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-md);
+  background: var(--omo-surface-muted);
+  padding: var(--omo-space-3);
+  max-height: 360px;
+}
+
+.prov-restart {
+  border: 1px solid var(--omo-warn-border);
+  background: var(--omo-warn-bg);
+  border-radius: var(--omo-radius-md);
+  padding: var(--omo-space-3);
+}
+
+.prov-restart-label {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prov-restart-warning {
+  margin: var(--omo-space-1) 0 0 22px;
+  font-size: 12px;
+  color: var(--omo-warn);
+}
+
+.prov-error-list {
+  margin: var(--omo-space-1) 0 0;
+  padding-left: var(--omo-space-4);
+}
+
+.prov-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+/* Auth surfaces */
+
+.prov-auth,
+.prov-oauth {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+.prov-auth-row {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+}
+
+.prov-auth-row .prov-input {
+  flex: 1;
+  max-width: 320px;
+}
+
+.prov-auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+  padding: var(--omo-space-3) var(--omo-space-4);
+  background: var(--omo-surface-muted);
+  border-top: 1px solid var(--omo-border);
+}
+
+.prov-oauth-pending {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+.prov-oauth-url {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+  word-break: break-all;
+  font-size: 12px;
+}
+
+.prov-tui {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-1);
+}
+
+.prov-tui-row {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  border: 1px solid var(--omo-border);
+  border-radius: var(--omo-radius-sm);
+  background: var(--omo-surface-muted);
+  padding: 6px 10px;
+}
+
+/* Enablement */
+
+.prov-enablement {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+.prov-off {
+  color: var(--omo-warn);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.prov-enablement-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-2);
+}
+
+/* Catalog */
+
+.prov-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--omo-space-3);
+}
+
+.prov-catalog-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.prov-catalog-detail-row td {
+  padding: 0 !important;
+  background: var(--omo-surface-muted);
+}
+
+.prov-identity-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  flex-wrap: wrap;
+}
+
+.prov-write-target {
+  margin: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .prov-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

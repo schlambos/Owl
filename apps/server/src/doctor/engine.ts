@@ -38,6 +38,7 @@ import {
   bridgeLifecycleRules,
 } from "./rules-groups";
 import { computeModelHealth, modelProbeRules } from "./rules-models";
+import { providerManagementRules } from "./rules-providers";
 import type { DiagnosticCategory } from "./types";
 
 export interface DoctorInputProvider {
@@ -81,6 +82,7 @@ export class DoctorEngine {
       ...configRules(input, ctx),
       ...schemaRules(input, ctx),
       ...providerModelRules(input, ctx),
+      ...providerManagementRules(input, ctx),
       ...modelProbeRules(input, ctx),
       ...agentRules(input, ctx),
       ...promptRules(input, ctx),

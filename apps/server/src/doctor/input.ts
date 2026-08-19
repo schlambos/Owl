@@ -121,6 +121,44 @@ export interface DoctorInput {
    */
   bridgeStatus?: TelemetryBridgeStatusDto;
 
+  /**
+   * OpenCode provider-management doctor surface (secret-free). Composed
+   * synchronously from the filesystem Desired state, the runtime provider
+   * snapshot, the cached GET /provider authority defaults, and the
+   * provider revision store. Absent when composition failed — provider
+   * management rules stay silent (conservative). Disabled/enable-conflict
+   * are CONTROL-PLANE interpretations of root enabled_providers /
+   * disabled_providers only (disabled wins), never a claimed OpenCode merge.
+   */
+  providerManagement?: {
+    entries: Array<{
+      id: string;
+      /** Declared under provider.<id> in the user-level config. */
+      inConfig: boolean;
+      /** Blacklisted model ids in the desired config. */
+      blacklist: string[];
+      /** Control-plane interpretation: id ∈ disabled_providers. */
+      disabled: boolean;
+      /** Control-plane interpretation: id ∈ both enabled + disabled. */
+      enableDisableConflict: boolean;
+      /** Also declared in the project-root config (masks user-level writes). */
+      projectMasked: boolean;
+      /** Joined from the live provider snapshot. */
+      livePresent: boolean;
+      connected: boolean;
+      /** The active (default) model for this provider from /provider authority. */
+      defaultModelId?: string;
+      /** The default model is inside the desired blacklist. */
+      blacklistedActiveModel: boolean;
+      /** Desired/configured but not connected (auth proxy — never probed). */
+      authMissing: boolean;
+      /** Desired inConfig but absent from the live provider snapshot. */
+      desiredNotLive: boolean;
+      /** File hash drift vs the last provider-management revision. */
+      externalConfigDrift: boolean;
+    }>;
+  };
+
   // Revisions
   revisions: {
     reachable: boolean;

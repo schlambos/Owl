@@ -414,6 +414,96 @@ export class OpenCodeClient {
     }
   }
 
+  // ── Provider auth (OpenCode provider management) ────────────────────
+  //
+  // OpenCode REST auth only. The key travels in the request body and exists
+  // in memory only for the duration of the call — it is never logged,
+  // cached, or echoed. Errors are sanitized with the key as an extra
+  // redaction needle.
+
+  /** auth.set → PUT /auth/{providerID} with body { type: "api", key }. */
+  async authSet(providerID: string, key: string): Promise<void> {
+    try {
+      await this.getJson<unknown>(`/auth/${encodeURIComponent(providerID)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "api", key }),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(sanitizeOpenCodeError(msg, [this.auth?.password, key]));
+    }
+  }
+
+  /** auth.remove → DELETE /auth/{providerID}. */
+  async authRemove(providerID: string): Promise<void> {
+    try {
+      await this.getJson<unknown>(`/auth/${encodeURIComponent(providerID)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(sanitizeOpenCodeError(msg, [this.auth?.password]));
+    }
+  }
+
+  /**
+   * provider.oauth.authorize → POST /provider/{id}/oauth/authorize with
+   * body { method: number, inputs?: Record<string, string> }.
+   */
+  async providerOauthAuthorize(
+    providerID: string,
+    req: { method: number; inputs?: Record<string, string> },
+  ): Promise<{ url?: string; method?: "auto" | "code"; instructions?: string }> {
+    const body: Record<string, unknown> = { method: req.method };
+    if (req.inputs !== undefined) body.inputs = req.inputs;
+    try {
+      const raw = await this.getJson<unknown>(
+        `/provider/${encodeURIComponent(providerID)}/oauth/authorize`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      // Allowlist extraction only — never forward fields we do not declare.
+      const r = (raw ?? {}) as Record<string, unknown>;
+      return {
+        url: typeof r.url === "string" ? r.url : undefined,
+        method: r.method === "auto" || r.method === "code" ? r.method : undefined,
+        instructions: typeof r.instructions === "string" ? r.instructions : undefined,
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(sanitizeOpenCodeError(msg, [this.auth?.password]));
+    }
+  }
+
+  /**
+   * provider.oauth.callback → POST /provider/{id}/oauth/callback with
+   * body { method: number, code?: string }.
+   */
+  async providerOauthCallback(
+    providerID: string,
+    req: { method: number; code?: string },
+  ): Promise<void> {
+    const body: Record<string, unknown> = { method: req.method };
+    if (req.code !== undefined) body.code = req.code;
+    try {
+      await this.getJson<unknown>(
+        `/provider/${encodeURIComponent(providerID)}/oauth/callback`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(sanitizeOpenCodeError(msg, [this.auth?.password, req.code]));
+    }
+  }
+
   // ── Probe session primitives (Slice 15; driven by the probe engine) ──
 
   /**

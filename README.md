@@ -55,6 +55,7 @@ Owl groups day-to-day work into configuration, explainability, and runtime visib
 
 - Built-in and custom agent assignments
 - Primary models, ordered fallback chains, variants, and provider options
+- OpenCode provider management: add OpenAI-compatible custom providers, native API-key and OAuth connect, per-provider model blacklists, and enable/disable
 - User and project presets with comparisons and lifecycle actions
 - Prompt replacement, append files, effective composition, and source inspection
 - Skills, Model Context Protocol (MCP) servers, tools, permissions, and global availability controls
@@ -76,6 +77,7 @@ Owl groups day-to-day work into configuration, explainability, and runtime visib
 ### Runtime visibility
 
 - Live OpenCode connection and provider/model inventory
+- Provider Desired/Effective/Live review with secret-free auth status and apply/restart awareness
 - Server-Sent Events (SSE) instead of aggressive polling
 - Session hierarchy with parent/child navigation
 - Messages, tool activity, file changes, diffs, permissions, and token/context details
@@ -151,12 +153,12 @@ Download the installer for your platform from the release page:
 | macOS (Apple Silicon) | `Owl_<version>_aarch64.dmg` (drag to Applications) or `Owl_aarch64.app.zip` | Built on macos-14 |
 | Windows (x64) | `Owl_<version>_x64-setup.exe` | NSIS installer |
 | Linux (x64) | `Owl_<version>_amd64.deb` or `Owl_<version>_amd64.AppImage` | Debian/Ubuntu-family deb; AppImage is distribution-portable |
-| Arch Linux / CachyOS (x64) | `owl-desktop-0.1.3-1-x86_64.pkg.tar.zst` | Native pacman package built with `makepkg` on the official `archlinux:base-devel` image |
+| Arch Linux / CachyOS (x64) | `owl-desktop-0.1.4-1-x86_64.pkg.tar.zst` | Native pacman package built with `makepkg` on the official `archlinux:base-devel` image |
 
 Arch Linux and CachyOS (fully Arch-compatible) users install the native package with:
 
 ```bash
-sudo pacman -U owl-desktop-0.1.3-1-x86_64.pkg.tar.zst
+sudo pacman -U owl-desktop-0.1.4-1-x86_64.pkg.tar.zst
 ```
 
 The package pulls in the required desktop runtime (`webkit2gtk-4.1`, `gtk3`, `libayatana-appindicator`, `librsvg`, icon/desktop/MIME integration) and lives at `packaging/arch/PKGBUILD` in this repository.
@@ -333,7 +335,7 @@ The deeper implementation notes live in [`docs/architecture`](docs/architecture/
 
 ## Project status
 
-Owl is at `0.1.3` and is being released as a working early-stage project. The main configuration, safety, diagnostics, model, agent, runtime, Council, ACP, and system-management surfaces are implemented, but OpenCode and OMO-Slim continue to evolve.
+Owl is at `0.1.4` and is being released as a working early-stage project. The main configuration, safety, diagnostics, model, agent, runtime, Council, ACP, provider-management, and system-management surfaces are implemented, but OpenCode and OMO-Slim continue to evolve.
 
 Owl prefers an honest `unknown` or `unavailable` state over inventing runtime data that the installed versions do not expose. Expect version-specific limitations around some OMO-Slim runtime details.
 

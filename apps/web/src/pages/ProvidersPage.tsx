@@ -125,6 +125,20 @@ export function ProvidersPage() {
           onChange={(s) => commit({ sort: s ?? { id: "name", dir: "asc" } })}
         />
         <TeamClearFocus hasFocus={hasFocus} onClear={clearFocus} />
+        <span className="team-providers-manage-links">
+          <Link
+            className="omo-btn omo-btn-secondary omo-btn-md"
+            to="/providers/manage"
+          >
+            Manage providers
+          </Link>
+          <Link
+            className="omo-btn omo-btn-primary omo-btn-md"
+            to="/providers/add"
+          >
+            Add provider
+          </Link>
+        </span>
       </div>
 
       <div className="agents-table-surface team-roster-surface">

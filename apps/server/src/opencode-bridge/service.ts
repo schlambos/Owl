@@ -146,6 +146,13 @@ export interface BridgeServiceOptions {
    * callers cannot forge the effective view. (oracle decision 7)
    */
   effectiveViewProvider: () => Promise<EffectivePluginView>;
+  /**
+   * Shared in-process opencode.json/jsonc write mutex. When provided, the
+   * bridge writer's secure atomic write runs inside this lock so provider
+   * management writes and bridge writes never interleave. Mutation
+   * semantics are otherwise unchanged.
+   */
+  writeLock?: <T>(fn: () => T) => Promise<T>;
 }
 
 export interface PreviewRequest {
@@ -523,7 +530,11 @@ export class BridgeService {
     }
 
     // 10. Secure atomic write with baseline check immediately before rename.
-    const writeResult = this.secureAtomicWrite(record.targetPath, proposedText, record.baselineHash);
+    //     Acquires the shared opencode config write mutex when wired so the
+    //     provider-management writer cannot interleave (semantics unchanged).
+    const writeResult = this.opts.writeLock
+      ? await this.opts.writeLock(() => this.secureAtomicWrite(record.targetPath, proposedText, record.baselineHash))
+      : this.secureAtomicWrite(record.targetPath, proposedText, record.baselineHash);
     if (!writeResult.ok) {
       this.opts.revisions.abortIntent(intentId);
       this.previewRegistry.delete(req.previewId);
@@ -1013,8 +1024,10 @@ export class BridgeService {
       });
     }
 
-    // Secure atomic write.
-    const writeResult = this.secureAtomicWrite(rev.targetPath, restoredText, rev.postWriteHash);
+    // Secure atomic write (inside the shared config write mutex when wired).
+    const writeResult = this.opts.writeLock
+      ? await this.opts.writeLock(() => this.secureAtomicWrite(rev.targetPath, restoredText, rev.postWriteHash))
+      : this.secureAtomicWrite(rev.targetPath, restoredText, rev.postWriteHash);
     if (!writeResult.ok) {
       this.opts.revisions.abortIntent(intentId);
       return { ok: false, errors: writeResult.errors };

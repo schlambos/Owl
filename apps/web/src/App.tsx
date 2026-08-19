@@ -6,6 +6,10 @@ import { OverviewPage } from "./pages/OverviewPage";
 import { ModelsPage } from "./pages/ModelsPage";
 import { AgentsPage } from "./pages/AgentsPage";
 import { ProvidersPage } from "./pages/ProvidersPage";
+import { ProviderManagementPage } from "./pages/ProviderManagementPage";
+import { AddProviderPage } from "./pages/AddProviderPage";
+import { ProviderEditPage } from "./pages/ProviderEditPage";
+import { ProviderBlacklistPage } from "./pages/ProviderBlacklistPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { ConfigPage } from "./pages/ConfigPage";
 import { CapabilitiesPage } from "./pages/CapabilitiesPage";
@@ -30,6 +34,10 @@ export function App() {
               <Route path="/models" element={<ModelsPage />} />
               <Route path="/agents" element={<AgentsPage />} />
               <Route path="/providers" element={<ProvidersPage />} />
+              <Route path="/providers/manage" element={<ProviderManagementPage />} />
+              <Route path="/providers/add" element={<AddProviderPage />} />
+              <Route path="/providers/:id/edit" element={<ProviderEditPage />} />
+              <Route path="/providers/:id/models" element={<ProviderBlacklistPage />} />
               <Route path="/sessions" element={<SessionsPage />} />
               <Route path="/config" element={<ConfigPage />} />
               <Route path="/capabilities" element={<CapabilitiesPage />} />
