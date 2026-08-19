@@ -26,12 +26,14 @@ import {
   mkdtempSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
+import { BridgeRevisionStore } from "../apps/server/src/opencode-bridge/revisions-bridge";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const RESOURCES = join(ROOT, "src-tauri", "resources");
@@ -187,6 +189,216 @@ async function waitExit(child: ChildProcess, ms: number): Promise<boolean> {
   return false;
 }
 
+// ── Managed-mode coverage (regression: dirty bridge must not block reuse) ──
+
+function json(value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/**
+ * Minimal deterministic fake OpenCode backend on the preferred loopback port
+ * (127.0.0.1:4096). Satisfies the lifecycle's full-compatibility probe
+ * (/global/health, /config/providers, /provider, /agent with orchestrator +
+ * 3 specialists) so the sidecar classifies it as a reusable preexisting
+ * backend. No real credentials/config are required.
+ */
+function startFakeOpenCode(port: number): { stop(): void } {
+  const agents = [
+    { name: "orchestrator" },
+    { name: "explorer" },
+    { name: "librarian" },
+    { name: "oracle" },
+  ];
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port,
+    fetch(req) {
+      const path = new URL(req.url).pathname;
+      if (path === "/global/health") return json({ healthy: true, version: "1.18.14" });
+      if (path === "/config/providers") return json({ providers: [] });
+      if (path === "/provider") return json({ all: [], connected: [] });
+      if (path === "/agent") return json(agents);
+      if (path === "/config") return json({ plugin: [] });
+      return json({});
+    },
+  });
+  return { stop: () => server.stop(true) };
+}
+
+/**
+ * Seed the exact shipped v0.1.2 failure shape: a committed ACTIVE bridge
+ * activation whose target config file has since drifted (external edit), so
+ * startup reconciliation classifies it recovery-pending. The DB lives at
+ * `<projectDir>/data/control-plane-bridge.db` (the sidecar's default path).
+ */
+function seedDirtyBridgeState(projectDir: string, configDir: string): void {
+  const dbPath = join(projectDir, "data", "control-plane-bridge.db");
+  const configPath = join(configDir, "opencode.json");
+  const store = new BridgeRevisionStore(dbPath, [projectDir, configDir]);
+  const content = `{"plugin":["/canonical/bridge"]}`;
+  writeFileSync(configPath, content, "utf-8");
+  const cfgHash = createHash("sha256").update(content).digest("hex");
+  store.insertPreparedIntent({
+    id: "intent_smoke_managed",
+    targetPath: configPath,
+    sourceKind: "opencode-config-dir",
+    operation: "add",
+    baselineHash: "h_base",
+    proposedHash: cfgHash,
+    canonicalIdentity: "/canonical/bridge",
+    port: 8788,
+    registrationTransport: "env",
+    transportMode: "loopback-http",
+    nonceFingerprint: "a".repeat(64),
+    bytePatch: "{}",
+    rawActivationNonce: "nonce-1234567890abcdef",
+  });
+  store.finalizeIntent("intent_smoke_managed", "rev_smoke_managed", new Date().toISOString(), cfgHash);
+  // External drift: modify the committed target after commit.
+  writeFileSync(configPath, `${content}\n// external drift\n`, "utf-8");
+  store.close();
+}
+
+interface LifecycleSnapshot {
+  status?: string;
+  ownership?: string;
+  generation?: number;
+  error?: { code?: string };
+}
+
+/** Poll /api/opencode/lifecycle until the predicate holds or the deadline passes. */
+async function awaitLifecycle(
+  origin: string,
+  predicate: (s: LifecycleSnapshot) => boolean,
+  timeoutMs: number,
+): Promise<LifecycleSnapshot> {
+  const deadline = Date.now() + timeoutMs;
+  let last: LifecycleSnapshot = {};
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${origin}/api/opencode/lifecycle`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (res.ok) {
+        last = (await res.json()) as LifecycleSnapshot;
+        if (predicate(last)) return last;
+      }
+    } catch {
+      /* not ready yet */
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return last;
+}
+
+/**
+ * Wait for the managed-mode listening line
+ * `[omo-cp] listening on http://127.0.0.1:<port>` (managed mode does not emit
+ * the desktop-only OWL_READY line). Returns the loopback origin.
+ */
+async function awaitListeningLine(
+  child: ChildProcess,
+  stdout: () => string,
+  stderr: () => string,
+): Promise<string> {
+  const deadline = Date.now() + 25_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `managed sidecar exited early (code=${child.exitCode} signal=${child.signalCode})` +
+          diag(stdout, stderr),
+      );
+    }
+    const m = /\[omo-cp\] listening on (http:\/\/127\.0\.0\.1:\d+)/.exec(stdout());
+    if (m?.[1]) return m[1];
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error("timed out waiting for managed listening line" + diag(stdout, stderr));
+}
+
+/**
+ * Managed-mode phase: prove a dirty bridge reconciliation does NOT block
+ * reuse of a compatible preexisting OpenCode backend (the shipped v0.1.2
+ * regression). Spawns the staged sidecar in managed mode (no
+ * OPENCODE_BASE_URL, no OMO_CP_DESKTOP) against a fake OpenCode on 4096 and
+ * a seeded dirty bridge DB, then asserts the lifecycle reaches
+ * connected/external (reuse) rather than failed/bridge-reconciliation-dirty.
+ */
+async function runManagedPhase(stage: string, stagedBin: string): Promise<void> {
+  const projectDir = mkdtempSync(join(tmpdir(), "omo-sidecar-mgmt-project-"));
+  const configDir = mkdtempSync(join(tmpdir(), "omo-sidecar-mgmt-config-"));
+  const fake = startFakeOpenCode(4096);
+  let child: ChildProcess | undefined;
+  let stdoutBuf = "";
+  let stderrBuf = "";
+  const maxBuf = 64 * 1024;
+  try {
+    seedDirtyBridgeState(projectDir, configDir);
+
+    const env: Record<string, string> = {};
+    for (const [k, v] of Object.entries(process.env)) {
+      if (v === undefined) continue;
+      if (["path", "home", "user", "shell", "tmp", "temp", "tmpdir"].includes(k.toLowerCase())) {
+        env[k] = v;
+      }
+    }
+    env["OMO_CP_HOST"] = "127.0.0.1";
+    env["OMO_CP_PORT"] = "0";
+    env["OMO_CP_INSTALL_DIR"] = stage;
+    env["OMO_CP_PROJECT_DIR"] = projectDir;
+    env["OPENCODE_CONFIG_DIR"] = configDir;
+    // Managed mode: OPENCODE_BASE_URL deliberately absent.
+
+    child = spawn(stagedBin, [], {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: stage,
+      windowsHide: true,
+    });
+    child.stdout?.on("data", (c: Buffer) => {
+      stdoutBuf += c.toString("utf-8");
+      if (stdoutBuf.length > maxBuf) stdoutBuf = stdoutBuf.slice(-maxBuf);
+    });
+    child.stderr?.on("data", (c: Buffer) => {
+      stderrBuf += c.toString("utf-8");
+      if (stderrBuf.length > maxBuf) stderrBuf = stderrBuf.slice(-maxBuf);
+    });
+
+    const origin = await awaitListeningLine(child, () => stdoutBuf, () => stderrBuf);
+    console.log(`[smoke-sidecar] managed ready: ${origin}`);
+
+    const snap = await awaitLifecycle(
+      origin,
+      (s) => s.status === "connected" || s.status === "failed",
+      30_000,
+    );
+    if (snap.status !== "connected" || snap.ownership !== "external") {
+      throw new Error(
+        `managed phase: expected connected/external reuse, got status=${snap.status} ownership=${snap.ownership} error=${snap.error?.code ?? "none"}`,
+      );
+    }
+    console.log(`[smoke-sidecar] managed phase ok: reused preexisting backend (external) despite dirty bridge`);
+
+    // Graceful shutdown via SIGTERM (managed mode has no shutdown token route).
+    child.kill("SIGTERM");
+    if (!(await waitExit(child, 10_000))) {
+      throw new Error("managed sidecar did not exit within 10s after SIGTERM");
+    }
+  } finally {
+    if (child && !(await waitExit(child, 500))) {
+      try { child.kill("SIGKILL"); } catch { /* */ }
+      await waitExit(child, 3000);
+    }
+    fake.stop();
+    for (const d of [projectDir, configDir]) {
+      try { rmSync(d, { recursive: true, force: true }); } catch { /* */ }
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const bin = parseArgs();
   requireResources();
@@ -287,6 +499,13 @@ async function main(): Promise<void> {
     console.log(`  origin: ${origin}`);
     console.log(`  stage: ${stage} (removed)`);
     console.log(`  checks: SPA html+CSP/XFO/nosniff, exact CORS, /api/health, JSON 404, shutdown auth (403/403/404/200+exit 0)`);
+
+    // ── Managed-mode phase: dirty bridge must not block preexisting reuse ──
+    // Regression for the shipped v0.1.2 failure: a committed active bridge
+    // whose target config drifted (recovery-pending reconciliation) must NOT
+    // block reuse of a compatible OpenCode already listening on 4096. The
+    // sidecar runs in managed mode (no OPENCODE_BASE_URL, no OMO_CP_DESKTOP).
+    await runManagedPhase(stage, stagedBin);
   } catch (e) {
     exitCode = 1;
     console.error(`[smoke-sidecar] failed: ${e instanceof Error ? e.message : String(e)}`);

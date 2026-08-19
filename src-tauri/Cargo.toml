@@ -1,6 +1,6 @@
 [package]
 name = "owl-desktop"
-version = "0.1.2"
+version = "0.1.3",
 description = "Owl desktop — local control plane for OpenCode and OMO-Slim"
 license = "Apache-2.0"
 edition = "2021"

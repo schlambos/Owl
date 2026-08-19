@@ -204,6 +204,53 @@ describe("OpenCodeLifecycleManager", () => {
     expect(starts).toBe(0);
   });
 
+  test("dirty bridge reconciliation does NOT block preexisting-backend reuse", async () => {
+    // Regression: a dirty reconciliation (e.g. committed-target config-hash
+    // drift) must not block reuse of a compatible preexisting backend on the
+    // preferred port. The bridge, if any, is already running in that external
+    // process; no owned spawn / bridge env overlay occurs on this path.
+    let starts = 0;
+    const manager = new OpenCodeLifecycleManager(cfg("managed"), {
+      probe: async (url) => {
+        expect(url).toBe(PREFERRED_OPENCODE_BASE_URL);
+        return fullReady();
+      },
+      startSdk: async () => {
+        starts++;
+        throw new Error("not expected");
+      },
+      bridge: {
+        isReconciliationClean: () => false, // dirty
+      },
+    });
+    const state = await manager.start();
+    expect(state.status).toBe("connected");
+    expect(state.ownership).toBe("external");
+    expect(state.detail).toContain("preexisting");
+    expect(starts).toBe(0);
+  });
+
+  test("dirty bridge reconciliation still blocks an owned start", async () => {
+    // The gate must still fail closed when an OWNED start is required (no
+    // reusable backend on the preferred port).
+    let starts = 0;
+    const manager = new OpenCodeLifecycleManager(cfg("managed"), {
+      probe: async () => ({ kind: "refused", readiness: { ...ready, health: false, rest: false } }),
+      startSdk: async () => {
+        starts++;
+        return { url: PREFERRED_OPENCODE_BASE_URL, close() {} };
+      },
+      portBindable: async () => true,
+      bridge: {
+        isReconciliationClean: () => false, // dirty
+      },
+    });
+    const state = await manager.start();
+    expect(state.status).toBe("failed");
+    expect(state.error?.code).toBe("bridge-reconciliation-dirty");
+    expect(starts).toBe(0);
+  });
+
   test("preexisting OpenCode waits for delayed OMO registration before reuse", async () => {
     let probes = 0;
     let sleeps = 0;
