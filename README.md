@@ -192,7 +192,14 @@ Detected paths are validated and persisted (small JSON under the app's config di
 The desktop app then starts its bundled sidecar on an ephemeral loopback port and loads the Owl UI from that exact origin. Closing the window shuts the sidecar down gracefully (authenticated loopback shutdown, then a bounded hard stop). OpenCode and OMO-Slim prerequisites apply exactly as with the source run: a working OpenCode install, Oh My OpenCode Slim installed in the selected config directory, and `@opencode-ai/sdk@1.18.14` under that config directory's `node_modules`.
 
 > [!WARNING]
-> The macOS and Windows installers are **unsigned**. On macOS, allow the app via **System Settings → Privacy & Security** (or remove quarantine with `xattr -dr com.apple.quarantine /Applications/Owl.app`). On Windows, click **More info → Run anyway** on the SmartScreen prompt.
+> The macOS and Windows installers are **unsigned**. macOS may report that **“Owl is damaged and can’t be opened”** even when the downloaded checksum is valid. After copying Owl to `/Applications`, removing Gatekeeper's quarantine attribute is currently a **required one-time installation step**:
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Owl.app
+> open /Applications/Owl.app
+> ```
+>
+> Run this only after verifying the release checksum. On Windows, click **More info → Run anyway** on the SmartScreen prompt.
 
 Linux builds are produced on Ubuntu 22.04 (glibc 2.35+) but the AppImage carries its own runtime payload; the deb targets Debian/Ubuntu-family systems.
 
