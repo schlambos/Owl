@@ -280,13 +280,14 @@ Other safety properties include:
 ## How it works
 
 ```mermaid
-flowchart LR
-    Browser[Owl web UI] -->|REST + SSE| Server[Owl local server]
-    Server -->|lifecycle + runtime API| OpenCode[OpenCode server]
+flowchart TB
+    UI[Owl UI] -->|REST + SSE| Server[Owl local server]
+    Server -->|start or attach| OpenCode[OpenCode server]
+    Server -->|read and write| Config[OpenCode + OMO config files]
+    Server --> State[Project SQLite state]
     OpenCode --> OMO[OMO-Slim plugin]
-    Server --> Config[OpenCode + OMO config files]
-    Server --> State[Local SQLite state]
-    Bridge[Optional telemetry bridge] --> Server
+    OpenCode --> Bridge[Telemetry bridge plugin]
+    Bridge -->|runtime telemetry| Server
 ```
 
 The repository is a Bun workspace:
@@ -299,7 +300,7 @@ packages/omo-telemetry-bridge Optional OpenCode plugin
 src-tauri                     Desktop shell (Tauri 2, Rust)
 ```
 
-The browser never edits configuration files directly. All parsing, resolution, validation, write transactions, backups, runtime communication, and filesystem checks live in the local server.
+The UI never edits configuration files directly. All parsing, resolution, validation, write transactions, backups, runtime communication, and filesystem checks live in the local server.
 
 ## Development
 
