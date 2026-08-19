@@ -9,14 +9,16 @@
  *
  * Slice 17: owned start integrates the non-barrel `withOwnedBridgeLaunchEnv`
  * from opencode-bridge/launch-boundary. BridgeRevisionStore is an optional
- * dependency (tests/disabled lane). After all dynamic imports, immediately
- * around the installed SDK `createOpencodeServer()` call: capture prior
- * present/absent values for OMO_BRIDGE_PORT and OMO_BRIDGE_ACTIVATION_NONCE;
- * delete stale values; apply verified overlay if enabled; invoke
- * createOpencodeServer synchronously and capture returned promise; restore
- * exact parent env in finally BEFORE awaiting. No other env reconstruction.
- * Attach/external never uses this path. If launch boundary fails, owned
- * start fails closed with redacted error before spawn.
+ * dependency (tests/disabled lane). Owned start is CLI-PRIMARY: it spawns
+ * `opencode serve` directly (startViaOpencodeCli) because compiled Bun
+ * sidecars cannot resolve cross-spawn's `which` require from the external
+ * SDK install. The verified overlay (port + raw nonce) is captured before
+ * any spawn; stale OMO_BRIDGE_PORT / OMO_BRIDGE_ACTIVATION_NONCE values
+ * are deleted before the child env snapshot and the exact parent env is
+ * restored before awaiting. No other env reconstruction. Attach/external
+ * never uses this path. If launch boundary fails, owned start fails closed
+ * with redacted error before spawn. The installed-SDK path remains as a
+ * fallback when the opencode binary cannot be resolved/spawned.
  */
 import type { BridgeRevisionStore } from "../opencode-bridge/revisions-bridge";
 import {
@@ -152,30 +154,131 @@ export class BridgeLaunchBoundaryError extends Error {
 }
 
 /**
- * Default owned SDK starter. Integrates `withOwnedBridgeLaunchEnv` around
- * the installed SDK `createOpencodeServer()` call.
+ * Default owned starter. CLI-PRIMARY: spawns `opencode serve` directly via
+ * node:child_process (startViaOpencodeCli), which replicates the installed
+ * SDK's createOpencodeServer contract exactly but does NOT depend on
+ * cross-spawn/`which` — required because compiled Bun sidecars run with
+ * load_package_json=false and cannot resolve `which` from the external
+ * SDK install. The installed-SDK path (startViaInstalledSdk) remains as a
+ * fallback when the opencode binary cannot be resolved or spawned, and its
+ * isModuleResolutionFailure detection remains as a safety net.
  *
- * If `bridgeStore` is provided, the launch boundary verifies committed
- * bridge activation state, checks for dirty reconciliation/conflicts, and
- * supplies the overlay (port + raw nonce) exclusively to the synchronous
- * spawn scope. If `bridgeStore` is omitted (disabled lane / tests), the
- * callback is invoked with an empty overlay (no bridge env injected).
- *
- * Env handling around createOpencodeServer():
- *  1. Capture prior present/absent values for OMO_BRIDGE_PORT and
- *     OMO_BRIDGE_ACTIVATION_NONCE.
- *  2. Delete stale values.
- *  3. Apply verified overlay if enabled (inside the launch boundary
- *     callback, synchronously before spawn).
- *  4. Invoke createOpencodeServer synchronously and capture the returned
- *     promise.
- *  5. Restore exact parent env in finally BEFORE awaiting.
- *
- * If the launch boundary fails (dirty reconciliation, conflict, transport
- * unverified, hash drift, missing nonce), owned start fails closed with a
- * redacted error before spawn.
+ * Bridge launch env semantics are unchanged: `withOwnedBridgeLaunchEnv`
+ * verifies committed activation state and supplies the overlay (port + raw
+ * nonce) before any spawn; stale OMO_BRIDGE_PORT / OMO_BRIDGE_ACTIVATION_NONCE
+ * values are deleted before spawn and the exact parent env is restored
+ * before any await. If the launch boundary fails (dirty reconciliation,
+ * conflict, transport unverified, hash drift, missing nonce), owned start
+ * fails closed with a redacted error before spawn.
  */
 export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
+  // The bridge store is read from the module-level variable set by
+  // setBridgeRevisionStoreForLaunch(). When undefined (disabled lane /
+  // tests), the launch boundary is skipped and the overlay is empty
+  // (no bridge env injected).
+  const store = currentBridgeStore;
+
+  // Capture prior bridge env state BEFORE anything touches env.
+  const priorBridgeEnv = captureBridgeEnv(process.env);
+
+  // Verify committed bridge activation state and capture the verified
+  // overlay. The boundary itself never mutates process.env; the raw nonce
+  // is confined to the overlay value plus the safe redaction closure.
+  let capturedOverlay: LaunchEnvOverlay = {};
+  let redactLaunchNonce: LaunchSecretRedactor | undefined;
+
+  if (store) {
+    const boundaryResult = withOwnedBridgeLaunchEnv(
+      { store },
+      (overlay, redact) => {
+        redactLaunchNonce = redact;
+        capturedOverlay = overlay;
+      },
+    );
+    if (!boundaryResult.ok) {
+      capturedOverlay = {};
+    }
+  }
+
+  // PRIMARY: direct `opencode serve` spawn. Stale bridge env values are
+  // deleted before the child env snapshot (taken synchronously inside
+  // startViaOpencodeCli) and restored BEFORE awaiting.
+  deleteBridgeEnv(process.env);
+  let cliPromise: Promise<ManagedSdkHandle>;
+  try {
+    cliPromise = startViaOpencodeCli(options, capturedOverlay);
+  } catch {
+    // Binary could not be resolved on PATH / GUI-safe dirs — fall back to
+    // the installed SDK path.
+    restoreBridgeEnv(process.env, priorBridgeEnv);
+    return startViaInstalledSdk(options, capturedOverlay, priorBridgeEnv, redactLaunchNonce);
+  }
+  restoreBridgeEnv(process.env, priorBridgeEnv);
+
+  try {
+    return await cliPromise;
+  } catch (error) {
+    if (isCliSpawnAvailabilityError(error)) {
+      // Binary vanished or could not be exec'd — fall back to the SDK path.
+      return startViaInstalledSdk(options, capturedOverlay, priorBridgeEnv, redactLaunchNonce);
+    }
+    throw new Error(
+      sanitizeSdkStartError(
+        error,
+        collectTransientSecrets(priorBridgeEnv, capturedOverlay),
+        redactLaunchNonce,
+      ),
+    );
+  }
+};
+
+/**
+ * Spawn errors that mean the opencode binary itself is unavailable, so the
+ * SDK fallback path is worth attempting. Timeouts / non-zero exits / parse
+ * failures mean the binary ran — retrying the same serve via the SDK would
+ * fail identically, so those do NOT fall back.
+ */
+function isCliSpawnAvailabilityError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === "ENOENT" || code === "EACCES";
+}
+
+/**
+ * Transient secret values eligible for redaction from start errors. Redaction
+ * only ever removes text; including overlay values here never exposes them.
+ */
+function collectTransientSecrets(
+  priorBridgeEnv: Record<BridgeEnvKey, string | undefined>,
+  overlay: LaunchEnvOverlay,
+): Array<string | undefined> {
+  return [
+    process.env.OPENCODE_SERVER_PASSWORD,
+    priorBridgeEnv.OMO_BRIDGE_ACTIVATION_NONCE,
+    priorBridgeEnv.OMO_BRIDGE_PORT,
+    overlay.OMO_BRIDGE_ACTIVATION_NONCE,
+    overlay.OMO_BRIDGE_PORT,
+  ];
+}
+
+/**
+ * FALLBACK owned start via the installed @opencode-ai/sdk@1.18.14
+ * createOpencodeServer(). The version gate applies ONLY to this path (the
+ * CLI primary path does not import the SDK at all).
+ *
+ * Env handling around createOpencodeServer():
+ *  1. Delete stale bridge env values.
+ *  2. Apply the verified overlay synchronously before spawn.
+ *  3. Invoke createOpencodeServer synchronously and capture the returned
+ *     promise (the SDK spreads ...process.env into the child).
+ *  4. Restore exact parent env BEFORE awaiting.
+ */
+async function startViaInstalledSdk(
+  options: ManagedSdkStartOptions,
+  overlay: LaunchEnvOverlay,
+  priorBridgeEnv: Record<BridgeEnvKey, string | undefined>,
+  redactLaunchNonce: LaunchSecretRedactor | undefined,
+): Promise<ManagedSdkHandle> {
   // Variable dynamic import intentionally resolves the active-config install,
   // rather than allowing a workspace dependency to drift from OpenCode.
   // The config dir comes from OPENCODE_CONFIG_DIR only — no default path.
@@ -194,113 +297,50 @@ export const startManagedSdkServer: ManagedSdkStarter = async (options) => {
     createOpencodeServer: ManagedSdkStarter;
   };
 
-  // The bridge store is read from the module-level variable set by
-  // setBridgeRevisionStoreForLaunch(). When undefined (disabled lane /
-  // tests), the launch boundary is skipped and the callback receives an
-  // empty overlay (no bridge env injected).
-  const store = currentBridgeStore;
-
-  // Capture prior bridge env state BEFORE the launch boundary touches env.
-  const priorBridgeEnv = captureBridgeEnv(process.env);
-
-  // The launch boundary callback runs synchronously. Inside it, we:
-  //  - delete stale bridge env values
-  //  - apply the verified overlay
-  //  - invoke createOpencodeServer synchronously
-  //  - capture the returned promise
-  // The raw nonce exists ONLY inside this callback scope.
-  let spawnPromise: Promise<ManagedSdkHandle> | undefined;
-  let capturedOverlay: LaunchEnvOverlay = {};
-  let boundaryError: BridgeLaunchBoundaryError | undefined;
-  // Safe redaction closure captured inside the launch boundary scope. It can
-  // redact the raw launch nonce from later SDK errors WITHOUT exposing it.
-  let redactLaunchNonce: LaunchSecretRedactor | undefined;
-
-  if (store) {
-    const boundaryResult = withOwnedBridgeLaunchEnv(
-      { store },
-      (overlay, redact) => {
-        redactLaunchNonce = redact;
-        capturedOverlay = overlay;
-        // Delete stale bridge env values.
-        deleteBridgeEnv(process.env);
-        // Apply the verified overlay (port + raw nonce, or empty when disabled).
-        applyBridgeOverlay(process.env, overlay);
-        // Invoke createOpencodeServer synchronously and capture the promise.
-        // The SDK spreads ...process.env into the child, so the overlay is
-        // visible to the synchronous spawn.
-        spawnPromise = invokeCreateOpencodeServer(sdk.createOpencodeServer, options);
-      },
-    );
-
-    if (!boundaryResult.ok) {
-      // Launch boundary failed closed: restore env, then fail with a redacted
-      // error before spawn. The raw nonce is never in the error.
-      restoreBridgeEnv(process.env, priorBridgeEnv);
-      const firstError = boundaryResult.errors[0];
-      boundaryError = new BridgeLaunchBoundaryError(
-        firstError?.code ?? "state-conflict",
-        firstError?.message ?? "Launch boundary verification failed.",
-      );
-    }
-  } else {
-    // Disabled lane: no launch boundary, empty overlay.
-    deleteBridgeEnv(process.env);
-    try {
-      spawnPromise = invokeCreateOpencodeServer(sdk.createOpencodeServer, options);
-    } catch (error) {
-      // Restore env before rethrowing.
-      restoreBridgeEnv(process.env, priorBridgeEnv);
-      throw error;
-    }
+  deleteBridgeEnv(process.env);
+  let spawnPromise: Promise<ManagedSdkHandle>;
+  try {
+    applyBridgeOverlay(process.env, overlay);
+    // Invoke synchronously and capture the promise; invokeCreateOpencodeServer
+    // converts sync throws into rejections, so env restore in finally is safe.
+    spawnPromise = invokeCreateOpencodeServer(sdk.createOpencodeServer, options);
+  } finally {
+    // Restore exact parent env BEFORE awaiting the spawn promise.
+    restoreBridgeEnv(process.env, priorBridgeEnv);
   }
-
-  if (boundaryError) {
-    throw boundaryError;
-  }
-
-  // Restore exact parent env BEFORE awaiting the spawn promise.
-  restoreBridgeEnv(process.env, priorBridgeEnv);
 
   // Await the captured promise. The SDK's error message may contain child
   // stderr/stdout with provider credentials or raw nonce values; sanitize
   // with sanitizeOpenCodeError before rethrowing so state/diagnostics/logs
-  // never observe raw secrets. Known auth/bridge env values are included
-  // transiently only inside the launch boundary callback scope (already
-  // restored above); the sanitized error never contains the raw nonce.
+  // never observe raw secrets.
   try {
-    return await spawnPromise!;
+    return await spawnPromise;
   } catch (error) {
     if (isModuleResolutionFailure(error)) {
-      // Compiled Bun sidecars cannot resolve cross-spawn's `which` require
-      // from ~/.config/opencode/node_modules. The SDK's createOpencodeServer
-      // is just `opencode serve` — spawn that CLI directly with the same
-      // args/env contract, including the captured bridge overlay.
+      // Safety net: compiled Bun sidecars cannot resolve cross-spawn's
+      // `which` require from ~/.config/opencode/node_modules. Retry the
+      // direct CLI spawn with the identical args/env contract.
       try {
-        return await startViaOpencodeCli(options, capturedOverlay);
+        return await startViaOpencodeCli(options, overlay);
       } catch (fallbackError) {
-        const transientSecrets: Array<string | undefined> = [
-          process.env.OPENCODE_SERVER_PASSWORD,
-          priorBridgeEnv.OMO_BRIDGE_ACTIVATION_NONCE,
-          priorBridgeEnv.OMO_BRIDGE_PORT,
-          capturedOverlay.OMO_BRIDGE_ACTIVATION_NONCE,
-          capturedOverlay.OMO_BRIDGE_PORT,
-        ];
         throw new Error(
-          sanitizeSdkStartError(fallbackError, transientSecrets, redactLaunchNonce),
+          sanitizeSdkStartError(
+            fallbackError,
+            collectTransientSecrets(priorBridgeEnv, overlay),
+            redactLaunchNonce,
+          ),
         );
       }
     }
-    const transientSecrets: Array<string | undefined> = [
-      process.env.OPENCODE_SERVER_PASSWORD,
-      priorBridgeEnv.OMO_BRIDGE_ACTIVATION_NONCE,
-      priorBridgeEnv.OMO_BRIDGE_PORT,
-    ];
     throw new Error(
-      sanitizeSdkStartError(error, transientSecrets, redactLaunchNonce),
+      sanitizeSdkStartError(
+        error,
+        collectTransientSecrets(priorBridgeEnv, overlay),
+        redactLaunchNonce,
+      ),
     );
   }
-};
+}
 
 function invokeCreateOpencodeServer(
   create: ManagedSdkStarter,

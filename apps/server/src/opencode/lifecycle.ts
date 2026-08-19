@@ -1394,21 +1394,6 @@ export class OpenCodeLifecycleManager {
   }
 
   private async startOwned(id: number, requestedPort: number): Promise<void> {
-    // Bridge reconciliation clean before an OWNED start. This is the correct
-    // enforcement point: an owned start injects the bridge env overlay via the
-    // launch boundary, so a dirty reconciliation (committed-target hash drift,
-    // unresolved/conflict intents) must block it. Preexisting-backend reuse
-    // (handled earlier in manage()) is unaffected.
-    if (!this.isReconciliationClean()) {
-      this.fail(
-        "bridge-reconciliation-dirty",
-        "Bridge reconciliation is dirty; resolve conflicts before owned start.",
-        "Resolve bridge conflicts/unresolved intents, then Retry.",
-        true,
-      );
-      return;
-    }
-
     let handle: ManagedSdkHandle;
     // Capture prior OPENCODE_CONFIG_DIR to restore after owned start.
     const priorConfigDir = process.env.OPENCODE_CONFIG_DIR;

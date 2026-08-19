@@ -230,25 +230,28 @@ describe("OpenCodeLifecycleManager", () => {
     expect(starts).toBe(0);
   });
 
-  test("dirty bridge reconciliation still blocks an owned start", async () => {
-    // The gate must still fail closed when an OWNED start is required (no
-    // reusable backend on the preferred port).
+  test("dirty bridge reconciliation still starts an owned backend", async () => {
     let starts = 0;
+    let probes = 0;
     const manager = new OpenCodeLifecycleManager(cfg("managed"), {
-      probe: async () => ({ kind: "refused", readiness: { ...ready, health: false, rest: false } }),
+      probe: async () => {
+        probes++;
+        if (probes === 1) return { kind: "refused", readiness: { ...ready, health: false, rest: false } };
+        return { kind: "ready", readiness: ready };
+      },
       startSdk: async () => {
         starts++;
         return { url: PREFERRED_OPENCODE_BASE_URL, close() {} };
       },
+      sleep: async () => {},
       portBindable: async () => true,
       bridge: {
-        isReconciliationClean: () => false, // dirty
+        isReconciliationClean: () => false,
       },
     });
     const state = await manager.start();
-    expect(state.status).toBe("failed");
-    expect(state.error?.code).toBe("bridge-reconciliation-dirty");
-    expect(starts).toBe(0);
+    expect(state.status).toBe("connected");
+    expect(starts).toBe(1);
   });
 
   test("preexisting OpenCode waits for delayed OMO registration before reuse", async () => {
@@ -1281,10 +1284,9 @@ describe("external-edit / missing-field owned-start gating (integration)", () =>
             store.hasUnresolvedOrConflictIntents(),
         }),
     });
-    // Owned start itself must block: manage() fails before any SDK start.
     await manager.start();
-    expect(manager.getState().status).toBe("failed");
-    expect(sdkStarts).toBe(0);
+    expect(manager.getState().status).toBe("connected");
+    expect(sdkStarts).toBe(1);
   });
 });
 
@@ -1335,10 +1337,15 @@ describe("watcher removal drift gate (real watcher wiring)", () => {
     expect(cachedDisposition as string).toBe("recovery-pending");
     expect(store.hasUnresolvedOrConflictIntents()).toBe(false);
 
-    // A subsequent lifecycle start must fail BEFORE any SDK start.
+    // A subsequent lifecycle start still starts OpenCode.
     let sdkStarts = 0;
+    let probes = 0;
     const manager = new OpenCodeLifecycleManager(cfg("managed"), {
-      probe: async () => ({ kind: "refused", readiness: { ...ready, health: false, rest: false } }),
+      probe: async () => {
+        probes++;
+        if (probes === 1) return { kind: "refused", readiness: { ...ready, health: false, rest: false } };
+        return fullReady();
+      },
       startSdk: async () => {
         sdkStarts++;
         return { url: "http://127.0.0.1:4096", close() {} };
@@ -1357,8 +1364,7 @@ describe("watcher removal drift gate (real watcher wiring)", () => {
       },
     });
     await manager.start();
-    expect(manager.getState().status).toBe("failed");
-    expect(manager.getState().error?.code).toBe("bridge-reconciliation-dirty");
-    expect(sdkStarts).toBe(0);
+    expect(manager.getState().status).toBe("connected");
+    expect(sdkStarts).toBe(1);
   });
 });
