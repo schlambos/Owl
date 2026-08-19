@@ -43,6 +43,14 @@
   min-width: 240px;
 }
 
+/* Manage/Add entry points on the Providers topology toolbar. */
+.team-providers-manage-links {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--omo-space-2);
+  margin-left: auto;
+}
+
 .team-roster-sort {
   display: inline-flex;
   align-items: center;

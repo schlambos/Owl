@@ -2290,3 +2290,208 @@ export interface MultiplexerSystemDto {
   warnings: Array<{ kind: string; message: string; severity: "info" | "warning" }>;
   generatedAt: string;
 }
+
+// ── OpenCode provider management (secret-free DTOs) ────────────────────
+//
+// Every type in this section is a DTO boundary for /api/opencode/providers/*.
+// Secrets (API keys, auth headers, raw GET /config, Provider.key, env, options)
+// NEVER appear in these shapes. Request bodies may carry a key, but it is
+// consumed in-memory and never echoed, logged, persisted, or revisioned.
+
+export type OpenCodeProviderSourceKind = "env" | "config" | "custom" | "api";
+
+/** Catalog entry: strict allowlist of GET /config/providers (+ connected join). */
+export interface OpenCodeProviderCatalogEntry {
+  id: string;
+  name?: string;
+  source: OpenCodeProviderSourceKind;
+  modelCount?: number;
+  connected: boolean;
+}
+
+export interface OpenCodeProviderCatalogDto {
+  providers: OpenCodeProviderCatalogEntry[];
+  connected: string[];
+  fetchedAt: string;
+  /** Secret-free issue summary when the live catalog was unavailable. */
+  issue?: string;
+}
+
+export interface OpenCodeProviderDesiredModel {
+  id: string;
+  name?: string;
+}
+
+/**
+ * Desired (filesystem user-level) provider state, path-extracted from the
+ * user-level opencode.json[c]. Never contains options.apiKey, whitelist,
+ * api, env, or any other secret-bearing field.
+ */
+export interface OpenCodeProviderDesiredEntry {
+  id: string;
+  /** True when declared under provider.<id> in the user-level config. */
+  inConfig: boolean;
+  custom: boolean;
+  name?: string;
+  baseURL?: string;
+  models: OpenCodeProviderDesiredModel[];
+  blacklist: string[];
+  /** Control-plane interpretation: present in root disabled_providers. */
+  disabled: boolean;
+  /** Control-plane interpretation: present in root enabled_providers. */
+  enabled: boolean;
+  /** In both enabled_providers and disabled_providers (disabled wins). */
+  enableDisableConflict: boolean;
+  /** Also declared in the project-root config (masks user-level writes). */
+  projectMasked: boolean;
+}
+
+/** Secret-free live overlay joined from GET /config/providers + /provider. */
+export interface OpenCodeProviderLiveOverlay {
+  id: string;
+  present: boolean;
+  name?: string;
+  modelCount: number;
+  connected: boolean;
+  source?: OpenCodeProviderSourceKind;
+}
+
+export type OpenCodeProviderWriteTarget =
+  | { kind: "opencode-config-dir"; path: string; sourceHash: string }
+  | { kind: "create"; path: string }
+  | { kind: "project-masked"; reason: string }
+  | { kind: "blocked"; reason: string };
+
+export interface OpenCodeProvidersManageDto {
+  desired: OpenCodeProviderDesiredEntry[];
+  live: OpenCodeProviderLiveOverlay[];
+  /** Provider ids declared in the project-root config (overlay flags only). */
+  projectMaskedProviders: string[];
+  writeTarget: OpenCodeProviderWriteTarget;
+  fetchedAt: string;
+  /** Secret-free issue summary when the live join was unavailable. */
+  liveIssue?: string;
+}
+
+// ── models/list (server-only SSRF-guarded fetch) ───────────────────────
+
+export interface OpenCodeProviderModelListRequest {
+  baseURL: string;
+  /** In-memory only: used for the Authorization header; never stored/echoed. */
+  apiKey?: string;
+}
+
+export interface OpenCodeProviderListedModel {
+  id: string;
+  name?: string;
+}
+
+export interface OpenCodeProviderModelListResponse {
+  ok: boolean;
+  models: OpenCodeProviderListedModel[];
+  error?: { code: string; message: string };
+}
+
+// ── Custom provider add (OpenAI-compatible only) ──────────────────────
+
+export type OpenCodeProviderCustomNpm =
+  | "@ai-sdk/openai-compatible"
+  | "@ai-sdk/openai";
+
+export interface OpenCodeProviderCustomSpec {
+  id: string;
+  name: string;
+  baseURL: string;
+  /** Defaults to @ai-sdk/openai-compatible. */
+  npm?: OpenCodeProviderCustomNpm;
+  models: OpenCodeProviderDesiredModel[];
+  /** Unticked model ids; omitted/empty means none. */
+  blacklist?: string[];
+}
+
+export type OpenCodeProviderMutation =
+  | { kind: "add-custom"; provider: OpenCodeProviderCustomSpec }
+  | { kind: "set-blacklist"; providerId: string; blacklist: string[] }
+  | { kind: "set-enablement"; providerId: string; enabled: boolean };
+
+export interface OpenCodeProviderSimulateRequest {
+  mutation: OpenCodeProviderMutation;
+}
+
+export interface OpenCodeProviderApplyRequest {
+  mutation: OpenCodeProviderMutation;
+  expectedSourceHash?: string;
+  /** After the config write, PUT /auth/{id} against the current Live backend. */
+  auth?: { apiKey: string };
+  /** After the config write (and auth), restart when owned. */
+  restart?: boolean;
+}
+
+export interface OpenCodeProviderMutationError {
+  code: string;
+  message: string;
+}
+
+export interface OpenCodeProviderSimulateResponse {
+  ok: boolean;
+  diff?: string;
+  targetPath?: string;
+  baselineHash?: string;
+  proposedHash?: string;
+  errors: OpenCodeProviderMutationError[];
+}
+
+export interface OpenCodeProviderRestartResult {
+  requested: boolean;
+  performed: boolean;
+  ok?: boolean;
+  code?: string;
+  message?: string;
+}
+
+export interface OpenCodeProviderApplyResponse {
+  ok: boolean;
+  revisionId?: string;
+  targetPath?: string;
+  baselineHash?: string;
+  postWriteHash?: string;
+  /** True when PUT /auth succeeded; false (with authError) on partial apply. */
+  authApplied?: boolean;
+  authError?: string;
+  restart?: OpenCodeProviderRestartResult;
+  errors: OpenCodeProviderMutationError[];
+}
+
+// ── Native provider auth (REST auth only) ─────────────────────────────
+
+export interface OpenCodeProviderAuthSetRequest {
+  key: string;
+}
+
+export interface OpenCodeProviderAuthResponse {
+  ok: boolean;
+  error?: OpenCodeProviderMutationError;
+}
+
+export interface OpenCodeProviderOauthAuthorizeRequest {
+  method: number;
+  inputs?: Record<string, string>;
+}
+
+export interface OpenCodeProviderOauthAuthorizeResponse {
+  ok: boolean;
+  url?: string;
+  method?: "auto" | "code";
+  instructions?: string;
+  error?: OpenCodeProviderMutationError;
+}
+
+export interface OpenCodeProviderOauthCallbackRequest {
+  method: number;
+  code?: string;
+}
+
+export interface OpenCodeProviderOauthCallbackResponse {
+  ok: boolean;
+  error?: OpenCodeProviderMutationError;
+}

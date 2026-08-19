@@ -421,6 +421,18 @@ export interface TelemetryBridgeRestartResult {
   state: OpenCodeLifecycleState;
 }
 
+/**
+ * Result of restartForOwnedConfigApply. Never contains secrets.
+ */
+export interface OwnedConfigApplyRestartResult {
+  ok: boolean;
+  code?: string;
+  /** Redacted, secret-free message. */
+  message?: string;
+  /** The lifecycle state after the attempt. */
+  state: OpenCodeLifecycleState;
+}
+
 export class OpenCodeLifecycleManager {
   private readonly env: Record<string, string | undefined>;
   private readonly auth?: OpenCodeBasicAuth;
@@ -444,6 +456,9 @@ export class OpenCodeLifecycleManager {
   // Telemetry-bridge activation restart state.
   private activationRestartPromise?: Promise<TelemetryBridgeRestartResult>;
   private activationRestartInFlight = false;
+  // Owned config-apply restart state (provider management R/W).
+  private configApplyRestartPromise?: Promise<OwnedConfigApplyRestartResult>;
+  private configApplyRestartInFlight = false;
 
   constructor(
     private readonly cfg: ServerConfig,
@@ -1034,6 +1049,179 @@ export class OpenCodeLifecycleManager {
       message: partial.message,
       state: this.getState(),
     };
+  }
+
+  // ── restartForOwnedConfigApply ────────────────────────────────────────
+
+  /**
+   * Explicit owned restart after an owned config write (OpenCode provider
+   * management apply). This is deliberately SEPARATE from
+   * restartForTelemetryBridge:
+   *  - It never calls restartForTelemetryBridge.
+   *  - It never consumes MANAGED_RESTART_DELAYS_MS (one explicit attempt
+   *    per call; no backoff schedule, restartIndex untouched).
+   *  - Allowed only when mode === "managed" AND ownership === "control-plane".
+   *    Attach mode and managed+external are rejected WITHOUT any process
+   *    action (the external backend is never closed); the caller surfaces a
+   *    warning while the Desired write already stands.
+   *  - Lifecycle generation increments exactly once on success.
+   */
+  async restartForOwnedConfigApply(): Promise<OwnedConfigApplyRestartResult> {
+    const fail = (
+      code: string,
+      message: string,
+    ): OwnedConfigApplyRestartResult => ({
+      ok: false,
+      code,
+      message,
+      state: this.getState(),
+    });
+
+    if (this.configApplyRestartInFlight || this.configApplyRestartPromise) {
+      return fail(
+        "config-apply-restart-in-flight",
+        "An owned config-apply restart is already in progress.",
+      );
+    }
+    if (this.stopping) {
+      return fail("lifecycle-stopping", "Lifecycle is stopping; cannot restart for config apply.");
+    }
+    if (this.activationRestartInFlight || this.activationRestartPromise) {
+      return fail(
+        "activation-restart-in-flight",
+        "A telemetry-bridge activation restart is in flight.",
+      );
+    }
+    if (this.restartPromise) {
+      return fail("ordinary-restart-in-flight", "An ordinary backend-loss restart is in flight.");
+    }
+    if (this.startPromise && this.state.status === "initializing") {
+      return fail("start-in-flight", "Lifecycle start is in flight.");
+    }
+
+    // Attach mode: warn only, no process action.
+    if (this.state.mode !== "managed") {
+      return fail(
+        "mode-not-managed",
+        "Owned config-apply restart requires managed mode; attached backend left untouched (Desired written).",
+      );
+    }
+
+    // Managed + external ownership: warn only, no process action. The
+    // external backend is never closed or adopted.
+    if (this.state.ownership !== "control-plane") {
+      return fail(
+        "ownership-not-control-plane",
+        "Owned config-apply restart requires control-plane ownership; external backend left untouched (Desired written).",
+      );
+    }
+
+    if (this.state.status !== "connected" || !this.owned) {
+      return fail(
+        "not-connected-owned",
+        "Config-apply restart requires a connected owned handle.",
+      );
+    }
+
+    // Bridge reconciliation clean before the owned restart.
+    if (!this.isReconciliationClean()) {
+      return fail(
+        "bridge-reconciliation-dirty",
+        "Bridge reconciliation is dirty; resolve conflicts before restart.",
+      );
+    }
+
+    // All preconditions passed: close ONLY the owned handle and do one
+    // explicit strict owned start. Never restartForTelemetryBridge, never
+    // the MANAGED_RESTART_DELAYS_MS schedule.
+    this.closeOwned();
+    this.configApplyRestartInFlight = true;
+    this.transition({
+      status: "restarting",
+      ready: emptyReadiness(this.state.ready.omoExpected),
+      error: undefined,
+      restart: undefined,
+      detail: "Owned config-apply restart in progress",
+    });
+
+    this.configApplyRestartPromise = this.runConfigApplyRestart()
+      .finally(() => {
+        this.configApplyRestartInFlight = false;
+        this.configApplyRestartPromise = undefined;
+      });
+    return this.configApplyRestartPromise;
+  }
+
+  private async runConfigApplyRestart(): Promise<OwnedConfigApplyRestartResult> {
+    const id = ++this.runId;
+    const priorConfigDir = process.env.OPENCODE_CONFIG_DIR;
+    try {
+      process.env.OPENCODE_CONFIG_DIR = this.cfg.opencodeConfigDir;
+      const handle = await this.startSdk({
+        hostname: "127.0.0.1",
+        port: 0, // OS-selected loopback port (strict owned start)
+        timeout: START_TIMEOUT_MS,
+      });
+      if (id !== this.runId || this.stopping) {
+        handle.close();
+        return {
+          ok: false,
+          code: "superseded",
+          message: "Config-apply restart was superseded or lifecycle stopped.",
+          state: this.getState(),
+        };
+      }
+      this.owned = handle;
+      let baseUrl: string;
+      try {
+        baseUrl = validManagedUrl(handle.url);
+      } catch (error) {
+        this.closeOwned();
+        this.fail("config-apply-restart-failed", error, "Explicit Retry after correcting the backend.", true);
+        return {
+          ok: false,
+          code: "invalid-managed-url",
+          message: this.sanitize(error),
+          state: this.getState(),
+        };
+      }
+      this.transition({
+        baseUrl,
+        ownership: "control-plane",
+        status: "waiting-health",
+        detail: "Owned SDK backend restarted for config apply; waiting for health",
+      });
+      const full = await this.waitReady(baseUrl, id);
+      if (full) {
+        // Success: generation increments exactly once (via activate).
+        this.restartIndex = 0;
+        this.activate(baseUrl, "control-plane", full, "Owned config-apply restart complete");
+        return { ok: true, state: this.getState() };
+      }
+      if (id !== this.runId && this.owned) {
+        this.closeOwned();
+      }
+      return {
+        ok: false,
+        code: "config-apply-restart-readiness-failed",
+        message: "OpenCode readiness timed out during the config-apply restart.",
+        state: this.getState(),
+      };
+    } catch (error) {
+      this.fail("config-apply-restart-failed", error, "Explicit Retry after correcting the backend.", true);
+      return {
+        ok: false,
+        code: "config-apply-restart-start-failed",
+        message: this.sanitize(error),
+        state: this.getState(),
+      };
+    } finally {
+      if (priorConfigDir === undefined) {
+        delete process.env.OPENCODE_CONFIG_DIR;
+      } else {
+        process.env.OPENCODE_CONFIG_DIR = priorConfigDir;
+      }
+    }
   }
 
   /**

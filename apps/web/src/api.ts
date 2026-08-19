@@ -9,6 +9,20 @@ import type {
   ModelProbeQueueSnapshot,
   ModelProbeRun,
   ModelProbeSummary,
+  OpenCodeProviderApplyRequest,
+  OpenCodeProviderApplyResponse,
+  OpenCodeProviderAuthResponse,
+  OpenCodeProviderAuthSetRequest,
+  OpenCodeProviderCatalogDto,
+  OpenCodeProviderModelListRequest,
+  OpenCodeProviderModelListResponse,
+  OpenCodeProviderOauthAuthorizeRequest,
+  OpenCodeProviderOauthAuthorizeResponse,
+  OpenCodeProviderOauthCallbackRequest,
+  OpenCodeProviderOauthCallbackResponse,
+  OpenCodeProviderSimulateRequest,
+  OpenCodeProviderSimulateResponse,
+  OpenCodeProvidersManageDto,
   OverviewDto,
   ProvidersDto,
   RawCommitResponse,
@@ -29,7 +43,6 @@ import {
   isRawCommitResponse,
   isRawPreviewResponse,
 } from "@omo/shared";
-
 async function getStatusJson(path: string): Promise<{ status: number; data: unknown }> {
   const res = await fetch(path);
   return { status: res.status, data: await res.json().catch(() => ({})) };
@@ -78,6 +91,25 @@ const post = (body: unknown): RequestInit => ({
   headers: { "content-type": "application/json" },
   body: JSON.stringify(body),
 });
+
+const jsonInit = (method: "PUT" | "DELETE", body?: unknown): RequestInit =>
+  body === undefined
+    ? { method }
+    : {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      };
+
+async function sendStatusJson<T = unknown>(
+  path: string,
+  init: RequestInit,
+): Promise<{ status: number; data: T }> {
+  const res = await fetch(path, init);
+  return { status: res.status, data: (await res.json().catch(() => ({}))) as T };
+}
+
+const provSeg = (s: string) => encodeURIComponent(s);
 
 export class RawContractError extends Error {
   readonly name = "RawContractError";
@@ -227,5 +259,56 @@ export const api = {
     getJson<ModelProbeQueueSnapshot>(
       `/api/models/probes/${encodeURIComponent(id)}/cancel`,
       { method: "POST" },
+    ),
+  // ── OpenCode provider management ────────────────────────────────────
+  // Contract owned by @omo/shared (secret-free DTOs). HTTP errors and
+  // 2xx-with-ok:false are both surfaced plainly by callers — no fake
+  // success. Request-body keys are write-only and never echoed.
+  opencodeProviderCatalog: () =>
+    getJson<OpenCodeProviderCatalogDto>("/api/opencode/providers/catalog"),
+  opencodeProviderManage: () =>
+    getJson<OpenCodeProvidersManageDto>("/api/opencode/providers/manage"),
+  opencodeProviderModelsList: (
+    body: OpenCodeProviderModelListRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderModelListResponse }> =>
+    sendStatusJson("/api/opencode/providers/models/list", post(body)),
+  opencodeProviderSimulate: (
+    body: OpenCodeProviderSimulateRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderSimulateResponse }> =>
+    sendStatusJson("/api/opencode/providers/simulate", post(body)),
+  opencodeProviderApply: (
+    body: OpenCodeProviderApplyRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderApplyResponse }> =>
+    sendStatusJson("/api/opencode/providers/apply", post(body)),
+  opencodeProviderSetAuth: (
+    id: string,
+    body: OpenCodeProviderAuthSetRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderAuthResponse }> =>
+    sendStatusJson(
+      `/api/opencode/providers/${provSeg(id)}/auth`,
+      jsonInit("PUT", body),
+    ),
+  opencodeProviderRemoveAuth: (
+    id: string,
+  ): Promise<{ status: number; data: OpenCodeProviderAuthResponse }> =>
+    sendStatusJson(
+      `/api/opencode/providers/${provSeg(id)}/auth`,
+      jsonInit("DELETE"),
+    ),
+  opencodeProviderOauthAuthorize: (
+    id: string,
+    body: OpenCodeProviderOauthAuthorizeRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderOauthAuthorizeResponse }> =>
+    sendStatusJson(
+      `/api/opencode/providers/${provSeg(id)}/oauth/authorize`,
+      post(body),
+    ),
+  opencodeProviderOauthCallback: (
+    id: string,
+    body: OpenCodeProviderOauthCallbackRequest,
+  ): Promise<{ status: number; data: OpenCodeProviderOauthCallbackResponse }> =>
+    sendStatusJson(
+      `/api/opencode/providers/${provSeg(id)}/oauth/callback`,
+      post(body),
     ),
 };

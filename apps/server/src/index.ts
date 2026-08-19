@@ -120,7 +120,18 @@ import { BridgeService } from "./opencode-bridge/service";
 import { createBridgeWatcher, type BridgeWatcher } from "./opencode-bridge/watcher";
 import { validateBridgeOverride } from "./opencode-bridge/override";
 import { canonicalBridgeDir } from "./opencode-bridge/canonical";
-import { resolveAuthorizedCandidate } from "./opencode-bridge/resolver";
+import { resolveAuthorizedCandidate, resolveSourceCandidates } from "./opencode-bridge/resolver";
+import { withOpenCodeConfigLock } from "./opencode-config/lock";
+import { OpenCodeConfigWriter } from "./opencode-config/writer";
+import {
+  ProviderRevisionStore,
+  defaultProviderRevisionDbPath,
+} from "./opencode-config/revisions";
+import { handleProviderManagementRequest } from "./opencode-config/routes";
+import {
+  extractDesiredProviderState,
+  providerIdsOfConfig,
+} from "./opencode-config/sanitizer";
 import type { SourceCandidate } from "./opencode-bridge/types";
 import {
   composeBridgeStatus,
@@ -185,6 +196,9 @@ if (bridgeRevisionDbOk && bridgeRevisions) {
       const client = runtime.getClient();
       return client.effectivePluginView({ owlInstallDirectory: cfg.owlInstallDirectory });
     },
+    // Shared in-process opencode.json/jsonc write mutex (provider
+    // management writes use the same lock; bridge semantics unchanged).
+    writeLock: (fn) => withOpenCodeConfigLock(fn),
   });
 }
 
@@ -201,30 +215,68 @@ if (bridgeRevisionDbOk && bridgeService) {
   }
 }
 
+// Shared bridge-reconciliation-clean hook (lifecycle owned starts AND
+// provider-management write gates use the same lifecycle boundary).
+const bridgeIsReconciliationClean = (): boolean => {
+  if (!bridgeRevisions) return true; // no bridge → assumed clean
+  // Align with the cached reconcile disposition: recovery-pending (and,
+  // via unresolved/conflict intents, conflict/drift) blocks repeated SDK
+  // starts as well as the launch boundary. Logic lives in the tested
+  // computeBridgeReconciliationClean helper — this closure only wires it.
+  return computeBridgeReconciliationClean({
+    cachedDisposition: bridgeReconcileDisposition.disposition,
+    hasUnresolvedOrConflictIntents: () =>
+      bridgeRevisions.hasUnresolvedOrConflictIntents(),
+  });
+};
+
 // 4. Construct lifecycle with bridge store, reconciliation-clean hook,
 //    passive port occupancy check. No second runtime. When DB is unavailable,
 //    lifecycle starts without managed bridge injection.
 const lifecycle = new OpenCodeLifecycleManager(cfg, {
   bridge: {
     ...(bridgeRevisions !== undefined ? { store: bridgeRevisions } : {}),
-    isReconciliationClean: () => {
-      if (!bridgeRevisions) return true; // no bridge → assumed clean
-      // Align with the cached reconcile disposition: recovery-pending (and,
-      // via unresolved/conflict intents, conflict/drift) blocks repeated SDK
-      // starts as well as the launch boundary. Logic lives in the tested
-      // computeBridgeReconciliationClean helper — this closure only wires it.
-      return computeBridgeReconciliationClean({
-        cachedDisposition: bridgeReconcileDisposition.disposition,
-        hasUnresolvedOrConflictIntents: () =>
-          bridgeRevisions.hasUnresolvedOrConflictIntents(),
-      });
-    },
+    isReconciliationClean: bridgeIsReconciliationClean,
   },
 });
 const runtime = new RuntimeStore(cfg.projectDirectory, cfg.authorizedRoots);
 const sessionDetails = new SessionDetailService(runtime);
 runtime.onEventReason = (reason) => sessionDetails.onRuntimeEvent(reason);
 runtime.start();
+
+// ── OpenCode provider management (additive R/W) ───────────────────────
+// Dedicated provider revision store + gated writer. DB construction
+// failure → fail closed cleanly: /api/opencode/providers/* write routes
+// become unavailable while read routes keep working with issue summaries.
+let providerRevisionDbOk = true;
+let providerRevisions: ProviderRevisionStore | undefined;
+let providerWriter: OpenCodeConfigWriter | undefined;
+try {
+  providerRevisions = new ProviderRevisionStore(
+    defaultProviderRevisionDbPath(cfg.projectDirectory),
+    cfg.authorizedRoots,
+  );
+} catch (e) {
+  providerRevisionDbOk = false;
+  const msg = e instanceof Error ? e.message : String(e);
+  console.error("[omo-cp] provider revision DB construction failed: %s", sanitizeOpenCodeError(msg));
+  providerRevisions = undefined;
+}
+if (providerRevisions) {
+  providerWriter = new OpenCodeConfigWriter({
+    opencodeConfigDir: cfg.opencodeConfigDir,
+    projectDirectory: cfg.projectDirectory,
+    owlInstallDirectory: cfg.owlInstallDirectory,
+    authorizedRoots: cfg.authorizedRoots,
+    revisions: providerRevisions,
+    effectiveViewProvider: async () => {
+      // Uses the CURRENT canonical OpenCodeClient only — no second runtime.
+      const client = runtime.getClient();
+      return client.effectivePluginView({ owlInstallDirectory: cfg.owlInstallDirectory });
+    },
+    isReconciliationClean: bridgeIsReconciliationClean,
+  });
+}
 
 // ── Slice 17: TelemetryBridgeManager (canonical bridge source) ──────
 // TelemetryBridgeManager is canonical. A valid explicit override is fed to
@@ -475,6 +527,87 @@ const doctor = new DoctorEngine((): DoctorInput => {
     /* multiplexer composition failure → multiplexer rules stay silent */
   }
 
+  // OpenCode provider-management doctor surface (secret-free, synchronous).
+  // Composition from filesystem Desired + runtime provider snapshot +
+  // cached /provider authority defaults + provider revision store.
+  // Independent try/catch: failures must never fail the doctor.
+  let providerManagement: DoctorInput["providerManagement"];
+  try {
+    const survey = resolveSourceCandidates({
+      opencodeConfigDir: cfg.opencodeConfigDir,
+      projectDirectory: cfg.projectDirectory,
+      owlInstallDirectory: cfg.owlInstallDirectory,
+      authorizedRoots: cfg.authorizedRoots,
+    });
+    const configDirCand = survey.candidates.find((c) => c.kind === "opencode-config-dir");
+    const projectCand = survey.candidates.find((c) => c.kind === "project-root");
+    const projectIds = projectCand ? providerIdsOfConfig(projectCand.text) : [];
+    const desired = configDirCand
+      ? extractDesiredProviderState(configDirCand.text, new Set(projectIds)).providers
+      : [];
+    let latestRev: ReturnType<ProviderRevisionStore["getLatestForTarget"]> = null;
+    try {
+      latestRev = configDirCand && providerRevisions
+        ? providerRevisions.getLatestForTarget(configDirCand.path)
+        : null;
+    } catch {
+      latestRev = null;
+    }
+    const drift = !!(configDirCand && latestRev && latestRev.postWriteHash !== configDirCand.hash);
+    const liveMap = new Map(live.providers.map((p) => [p.id, p]));
+    let defaults: Record<string, string> = {};
+    try {
+      defaults = runtime.getClient().getProviderAuthority()?.defaults ?? {};
+    } catch {
+      defaults = {};
+    }
+    const entries: NonNullable<DoctorInput["providerManagement"]>["entries"] = [];
+    const seen = new Set<string>();
+    for (const p of desired) {
+      seen.add(p.id);
+      const liveP = liveMap.get(p.id);
+      const defaultModelId = defaults[p.id];
+      entries.push({
+        id: p.id,
+        inConfig: p.inConfig,
+        blacklist: p.blacklist,
+        disabled: p.disabled,
+        enableDisableConflict: p.enableDisableConflict,
+        projectMasked: p.projectMasked,
+        livePresent: liveP !== undefined,
+        connected: liveP?.connected ?? false,
+        defaultModelId,
+        blacklistedActiveModel:
+          defaultModelId !== undefined && p.blacklist.includes(defaultModelId),
+        authMissing: p.inConfig && liveP !== undefined && !liveP.connected,
+        desiredNotLive: p.inConfig && liveP === undefined,
+        externalConfigDrift: drift && p.inConfig,
+      });
+    }
+    // Project-only ids: masked by the project config, absent from desired.
+    for (const id of projectIds) {
+      if (seen.has(id)) continue;
+      const liveP = liveMap.get(id);
+      entries.push({
+        id,
+        inConfig: false,
+        blacklist: [],
+        disabled: false,
+        enableDisableConflict: false,
+        projectMasked: true,
+        livePresent: liveP !== undefined,
+        connected: liveP?.connected ?? false,
+        blacklistedActiveModel: false,
+        authMissing: false,
+        desiredNotLive: false,
+        externalConfigDrift: false,
+      });
+    }
+    providerManagement = { entries };
+  } catch {
+    /* provider-management composition failure → provider rules stay silent */
+  }
+
   let revList: ReturnType<RevisionStore["list"]> = [];
   try {
     revList = revisionDbOk ? revisions.list(1) : [];
@@ -543,6 +676,7 @@ const doctor = new DoctorEngine((): DoctorInput => {
     omoTelemetry,
     ...(modelInventory ? { modelInventory } : {}),
     ...(multiplexerInput ? { multiplexer: multiplexerInput } : {}),
+    ...(providerManagement ? { providerManagement } : {}),
     // Slice 17: sanitized bridge lifecycle/status DTO.
     ...(bridgeRevisionDbOk ? {
       bridgeStatus: composeBridgeStatus({
@@ -1486,6 +1620,24 @@ async function handleRequest(req: Request): Promise<Response> {
           connection: live.connection,
           fetchedAt: live.fetchedAt,
         });
+      }
+
+      // ── OpenCode provider management (additive R/W) ───────────────
+      // Registered right after the existing /api/providers route; returns
+      // undefined for non-provider-management paths.
+      if (providerWriter) {
+        const pmResponse = await handleProviderManagementRequest(req, url, {
+          paths: {
+            opencodeConfigDir: cfg.opencodeConfigDir,
+            projectDirectory: cfg.projectDirectory,
+            owlInstallDirectory: cfg.owlInstallDirectory,
+            authorizedRoots: cfg.authorizedRoots,
+          },
+          getClient: () => runtime.getClient(),
+          writer: providerWriter,
+          lifecycle,
+        });
+        if (pmResponse) return pmResponse;
       }
 
       // ── Model inventory & probing (Slice 15, Lane 1) ─────────
@@ -2639,6 +2791,7 @@ async function shutdown(signal: string): Promise<void> {
   await lifecycle.stop();
   // Composition root owns and closes bridge store only after lifecycle.stop.
   try { bridgeRevisions?.close(); } catch { /* idempotent */ }
+  try { providerRevisions?.close(); } catch { /* idempotent */ }
   server.stop(true);
   if (cfg.desktop) {
     // Desktop shutdown is initiated over HTTP (or a signal) rather than by
